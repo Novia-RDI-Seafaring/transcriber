@@ -1,0 +1,18 @@
+# Ignore data directory
+data/audio/*
+data/diarization/*
+data/vtt/*
+data/video/*
+
+# Unignore sample subdirectories
+!data/audio/sample/
+!data/diarization/sample/
+!data/vtt/sample/
+
+# Ignore other files and directories
+flagged
+__pycache__
+.pytest_cache
+.ipynb_checkpoints
+.DS_Store
+env

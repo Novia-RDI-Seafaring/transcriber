@@ -1,0 +1,7 @@
+pytube
+tqdm
+pydub
+openai==1.16.0
+pytest
+pyannote.audio
+webvtt-py
