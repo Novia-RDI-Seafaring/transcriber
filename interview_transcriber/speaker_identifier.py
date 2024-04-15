@@ -3,7 +3,8 @@ import torchaudio
 from pydub import AudioSegment
 from pyannote.core import Segment
 from interview_transcriber.file_utils import ensure_path_exists
-import os
+from interview_transcriber.audio_transcriber import combine_subtitle_lines
+import os, re
 
 def get_wav_path(audio_path):
     _, ext = os.path.splitext(audio_path)
@@ -105,50 +106,121 @@ def generate_speaker_clips(diarization_output, audio_path):
 def generate_transcript_with_speakers(vtt_file_path, diarization_results, output_file_path):
     # Load diarization results
     # Assuming diarization_results is a dictionary where keys are speaker labels and values are lists of segments
-    # If diarization_results is in a different format, adjust this part accordingly
 
     # Open VTT file
     with open(vtt_file_path, 'r') as vtt_file:
         vtt_content = vtt_file.read()
 
-    # Open output file for writing
+    # Combine subtitle lines
+    combined_subtitles = combine_subtitle_lines(vtt_content)
+    subtitle_blocks = combined_subtitles.split("\n\n")
+    # Initialize list to store transcript with speaker information
+    transcript_with_speakers = []
+
+    # Iterate over each combined subtitle block
+    for subtitle_block in subtitle_blocks:
+        # Find the corresponding diarization speaker for the subtitle block
+        speaker = find_speaker_for_segment(diarization_results, subtitle_block)
+        subtitle_info = extract_subtitle_info(subtitle_block)
+        if subtitle_info is not None:
+            subtitle_info["speaker"] = speaker
+
+            # Append the subtitle info to the transcript
+            transcript_with_speakers.append(subtitle_info)
+
+    # Write transcript with speaker information to the output file
     with open(output_file_path, 'w') as f:
-        # Iterate over each speaker in the diarization results
-        #for speaker, segments in diarization_results.items():
-        for i, (segment, track, speaker) in enumerate(diarization_results.itertracks(yield_label=True)):
+        for subtitle_info in transcript_with_speakers:
+            f.write(f"{subtitle_info['speaker']}: ")
+            #f.write(f"{subtitle_info['start']} --> {subtitle_info['end']}\n")
+            f.write(f"{subtitle_info['text']}\n\n")
 
-            # Iterate over each segment for the current speaker
-            #for segment in segments:
-            # Find the corresponding subtitle for the segment
-            subtitle = find_subtitle_for_segment(vtt_content, segment)
-            if subtitle:
-                # Write speaker label and subtitle text to the output file
-                f.write(f"{speaker}: {subtitle.text}\n")
-            else:
-                # If no corresponding subtitle found, write only the speaker label
-                f.write(f"{speaker}:\n")
+import logging
 
-def find_subtitle_for_segment(vtt_content, segment):
-    # Split VTT content into individual subtitle blocks
-    subtitles = vtt_content.split('\n\n')
+def find_speaker_for_segment(diarization_results, subtitle_block):
+    # Extract start time string from the subtitle block
+    start_time_str = subtitle_block.split("\n")[0].strip()
+    
+    try:
+        # Convert start time string to seconds
+        center_time = find_center_time(start_time_str)
+    except ValueError:
+        # Log a warning for invalid time format
+        print(f"Invalid VTT time format--->: {start_time_str}")
+        return None
 
-    # Iterate over each subtitle block
-    for subtitle_block in subtitles:
-        # Check if the subtitle block contains the segment's start and end time
-        if segment_to_vtt_time(segment.start) in subtitle_block and segment_to_vtt_time(segment.end) in subtitle_block:
-            # Extract the subtitle text
-            subtitle_lines = subtitle_block.split('\n')
-            text = ' '.join(subtitle_lines[2:])  # Exclude timing information
-            return Subtitle(text)
-    return None
+    # If start_time is None, return None
+    if center_time is None:
+        print(f"Center time is None--->: {start_time_str}")
+        return None
 
-def segment_to_vtt_time(ms):
-    # Convert milliseconds to VTT time format (00:00:00.000)
-    seconds, milliseconds = divmod(ms, 1000)
-    minutes, seconds = divmod(seconds, 60)
-    hours, minutes = divmod(minutes, 60)
-    return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
+    # Iterate over diarization results to find the speaker for the subtitle block
+    for segment, track, speaker in diarization_results.itertracks(yield_label=True):
+        if segment is not None and segment.start <= center_time < segment.end:
+            return speaker
+    
+def vtt_time_to_seconds(time_str):
+    try:
+        # Define a regular expression pattern to match the time components
+        pattern = r'(\d{2}):(\d{2}):(\d{2})\.(\d{3})'
 
-class Subtitle:
-    def __init__(self, text):
-        self.text = text
+        # Search for the pattern in the time string
+        match = re.search(pattern, time_str)
+
+        if match:
+            # Extract the matched groups for hours, minutes, seconds, and milliseconds
+            hours = int(match.group(1))
+            minutes = int(match.group(2))
+            seconds = int(match.group(3))
+            milliseconds = int(match.group(4))
+
+            # Calculate the total number of seconds, including milliseconds
+            total_seconds = hours * 3600 + minutes * 60 + seconds + milliseconds / 1000
+
+            return total_seconds
+        else:
+            print(f"Error: Invalid VTT time format: {time_str}")
+            return None
+    except (ValueError, IndexError):
+        # Handle the case where the time string is not in the expected format
+        print("Error: Invalid VTT time format2")
+        return None
+
+def extract_subtitle_info(subtitle_block):
+    # Split the subtitle block by '\n'
+    lines = subtitle_block.strip().split('\n')
+
+    # Check if the subtitle block contains at least one line
+    if not lines:
+        return None
+
+    # Extract start and end times
+    timestamps = lines[0].split('-->')
+    if len(timestamps) != 2:
+        return None
+
+    start_time = timestamps[0].strip()
+    end_time = timestamps[1].strip()
+
+    # Extract text
+    text = ' '.join(lines[1:]).strip()
+
+    # Create and return a dictionary with the subtitle information
+    return {
+        'start': start_time,
+        'end': end_time,
+        'text': text
+    }
+
+def find_center_time(time_range_str):
+    # Extract start and end times from the time range string
+    start_time_str, end_time_str = time_range_str.split(" --> ")
+
+    # Convert start and end times to seconds
+    start_time_seconds = vtt_time_to_seconds(start_time_str)
+    end_time_seconds = vtt_time_to_seconds(end_time_str)
+
+    # Calculate the center time in seconds
+    center_time_seconds = (start_time_seconds + end_time_seconds) / 2
+
+    return center_time_seconds
