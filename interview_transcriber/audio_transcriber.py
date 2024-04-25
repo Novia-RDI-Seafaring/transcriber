@@ -57,7 +57,7 @@ def transcribe(audio_path, chunk_length_ms=10*60*1000, progress=None, progress_t
         # Split the audio into the specified chunk
         start = i * chunk_length_ms
         end = min((i + 1) * chunk_length_ms, len(audio))
-        chunk = audio[start:end]
+        chunk = audio[start:end]    
         
         # Export the chunk to a temporary file
         chunk_file = f"temp_chunk_{i}.mp3"
@@ -103,6 +103,8 @@ def combine_subtitle_lines(vtt_content_or_path):
     end_time = None
     combined_text = ""
 
+    subtitle_data = []
+
     # Iterate over each subtitle block
     for block in subtitle_blocks:
         # Extract the start and end timestamps from the block
@@ -111,6 +113,7 @@ def combine_subtitle_lines(vtt_content_or_path):
             continue
         start, end = timestamps
 
+
         # Extract the subtitle text from the block
         text = " ".join(block.split("\n")[1:])
 
@@ -118,14 +121,29 @@ def combine_subtitle_lines(vtt_content_or_path):
         if start_time is None or (time_to_seconds(start) - time_to_seconds(end_time)) > 1:
             # If this is not the first subtitle block, append the previous combined subtitle to the list
             if start_time is not None:
-                combined_subtitle_lines.append(f"{start_time} --> {end_time}\n{combined_text}")
-
+                #combined_subtitle_lines.append(f"{start_time} --> {end_time}\n{combined_text}")
+                combined_subtitle_lines.append({
+                    "start": time_to_seconds(start_time),
+                    "end": time_to_seconds(end_time),
+                    "duration": time_to_seconds(end_time) - time_to_seconds(start_time),
+                    "text": combined_text,
+                    "vtt": f"{start_time} --> {end_time}\n{combined_text}"
+                })
             # Update start time for the new timestamp block
             start_time = start
 
             # Initialize end time and combined text for the new timestamp block
             end_time = end
             combined_text = text
+
+            subtitle_data.append({
+                "start": time_to_seconds(start_time),
+                "end": time_to_seconds(end_time),
+                "duration": time_to_seconds(end_time) - time_to_seconds(start_time),
+                "text": combined_text,
+                "vtt": f"{start_time} --> {end_time}\n{combined_text}"
+
+            })
         else:
             # Combine the subtitle text with the previous one
             combined_text += " " + text
@@ -133,14 +151,31 @@ def combine_subtitle_lines(vtt_content_or_path):
             # Update the end time to the end time of the current subtitle block
             end_time = end
 
+            # Check if the current subtitle block ends with a sentence-ending punctuation
+            if text.endswith(".") or text.endswith("?") or text.endswith("!"):
+                # If the subtitle block ends with punctuation, treat it as the end of a sentence
+                # Append the combined subtitle to the list and reset variables for the next subtitle
+                combined_subtitle_lines.append({
+                    "start": time_to_seconds(start_time),
+                    "end": time_to_seconds(end_time),
+                    "duration": time_to_seconds(end_time) - time_to_seconds(start_time),
+                    "text": combined_text,
+                    "vtt": f"{start_time} --> {end_time}\n{combined_text}"
+                })
+                start_time = None
+                end_time = None
+                combined_text = ""
+
     # Append the last combined subtitle block to the list
-    combined_subtitle_lines.append(f"{start_time} --> {end_time}\n{combined_text}")
-
+    #combined_subtitle_lines.append(f"{start_time} --> {end_time}\n{combined_text}")
+    combined_subtitle_lines.append({
+        "start": time_to_seconds(start_time),
+        "end": time_to_seconds(end_time),
+        "duration": time_to_seconds(end_time) - time_to_seconds(start_time),
+        "text": combined_text,
+        "vtt": f"{start_time} --> {end_time}\n{combined_text}"
+    })
     # Add "WEBVTT" at the beginning of the combined subtitle text
-    combined_subtitle_text = "WEBVTT\n\n" + "\n\n".join(combined_subtitle_lines)
+    combined_subtitle_text = "WEBVTT\n\n" + "\n\n".join(map(lambda x:x["vtt"], combined_subtitle_lines))
 
-    print("Combined subtitle lines:")
-    print(combined_subtitle_text)
-    return combined_subtitle_text
-
-
+    return combined_subtitle_text, combined_subtitle_lines

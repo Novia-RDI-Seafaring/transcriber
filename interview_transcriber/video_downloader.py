@@ -26,7 +26,7 @@ def download_youtube_video(video_url, folder_path='data/video/youtube'):
         ensure_path_exists(folder)
 
         # Get the highest resolution stream available
-        video_stream = yt.streams.get_highest_resolution()
+        video_stream = yt.streams.get_lowest_resolution()
         
         # Download the video
         video_path = video_stream.download(output_path=folder)

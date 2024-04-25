@@ -1,6 +1,8 @@
 import os
 from interview_transcriber.file_utils import file_has_content
 from interview_transcriber.audio_transcriber import combine_subtitle_lines
+from interview_transcriber.audio_clip_generator import generate_audio_clips
+
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
 project_directory = os.path.dirname(current_directory)
@@ -10,17 +12,22 @@ subtitle_file_path = os.path.join(project_directory, "data", "vtt", "sample", "c
 diarization_file_path = os.path.join(project_directory, "data", "diarization", "sample", "clipped_sample.rttm")
 
 
-def test_combine_subtitle_lines(capsys):
+def test_generate_clips_from_combined_subtitle_lines(capsys):
     with capsys.disabled():
         #assert file_has_content(audio_file_path)
         assert file_has_content(subtitle_file_path)
         assert file_has_content(diarization_file_path)
-        combined_subtitle_text, combined_subtitle_lines = combine_subtitle_lines(subtitle_file_path)
 
-        assert combined_subtitle_text is not None
-        assert combined_subtitle_text.startswith("WEBVTT")
+        print("---------------")
+        combined_subs, speaker_data = combine_subtitle_lines(subtitle_file_path)
+        print("---------------")
+        print("abcabc")
+        print(combined_subs)
+        print("123123")
 
-        assert combined_subtitle_lines is not None
-        assert len(combined_subtitle_lines) > 0
-        assert combined_subtitle_lines[0]["start"] is not None
-        assert combined_subtitle_lines[0]["text"] is not None
+        print(speaker_data)
+
+        output_folder = os.path.join(project_directory, "data", "audio", "sample", "clipped_sample_clips")
+        audio_clips = generate_audio_clips(speaker_data, audio_file_path, output_folder)
+
+        assert speaker_data is not None

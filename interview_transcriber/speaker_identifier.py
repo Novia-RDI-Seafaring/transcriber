@@ -36,6 +36,9 @@ def identify_speakers(audio_path):
     # instantiate the pipeline
     pipeline = Pipeline.from_pretrained(
     "pyannote/speaker-diarization-3.1",
+    ## Try Titannet https://huggingface.co/nvidia/speakerverification_en_titanet_large
+    # Umap => embeddings till 2d
+    # Plotly / dash => markera...
     use_auth_token=os.environ["HUGGINGFACE_ACCESS_TOKEN"])
     
     waveform, sample_rate = torchaudio.load(wav_path)

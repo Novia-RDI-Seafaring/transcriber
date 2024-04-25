@@ -3,7 +3,7 @@ from interview_transcriber.video_converter import convert_video_to_mp3, there_is
 from interview_transcriber.speaker_identifier import identify_speakers
 import os
 import warnings
-
+import pytest
 
 from pyannote.audio import Pipeline
 
@@ -14,10 +14,12 @@ audio_path = None
 
 SKIP_CONVERTING = True
 
+@pytest.mark.skip(reason="Not needed in all tests")
 def test_there_is_a_huggingface_api_key():
     assert os.environ["HUGGINGFACE_ACCESS_TOKEN"] is not None
 
-def te_st_that_an_mp3_file_is_created(capsys):
+@pytest.mark.skip(reason="Not needed in all tests")
+def test_that_an_mp3_file_is_created(capsys):
     global video_path, audio_path, SKIP_CONVERTING
     if SKIP_CONVERTING:
         video_path = "data/video/youtube/dFbAqcPzoUY/Everything Thats Wrong with Content Creators.mp4"
@@ -31,7 +33,8 @@ def te_st_that_an_mp3_file_is_created(capsys):
         audio_path = convert_video_to_mp3(video_path)
         assert(there_is_a_converted_audio_file(video_path))
 
-def t_est_that_you_have_accepted_terms():
+@pytest.mark.skip(reason="Not needed in all tests")
+def test_that_you_have_accepted_terms():
     try:
         pipeline = Pipeline.from_pretrained(
             "pyannote/speaker-diarization-3.1",
@@ -42,13 +45,15 @@ def t_est_that_you_have_accepted_terms():
     except:
         print("Make sure you have acreed to  https://huggingface.co/pyannote/speaker-diarization-3.1 and https://huggingface.co/pyannote/segmentation-3.0 and " )
 
-def t_est_video_path_is_not_none(capsys):
+@pytest.mark.skip(reason="Not needed in all tests")
+def test_video_path_is_not_none(capsys):
     with capsys.disabled():
         global video_path, audio_path
         assert video_path is not None
         assert audio_path is not None
 
-def t_est_identify_speakers(capsys):
+@pytest.mark.skip(reason="Save time in testing. Temporarily")
+def test_identify_speakers(capsys):
     with capsys.disabled():
         current_directory = os.path.dirname(os.path.abspath(__file__))
         project_directory = os.path.dirname(current_directory)

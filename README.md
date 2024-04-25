@@ -36,3 +36,5 @@ def translate_text(text, language):
 
 
 ```
+
+also check out https://github.com/NVIDIA/NeMo/blob/main/tutorials/speaker_tasks/Speaker_Diarization_Inference.ipynb

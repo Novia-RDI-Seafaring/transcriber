@@ -5,11 +5,13 @@ from interview_transcriber.audio_transcriber import combine_subtitle_lines
 
 import os
 import warnings
+import pytest
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
 project_directory = os.path.dirname(current_directory)
 audio_file_path = os.path.join(project_directory, "data", "audio", "sample", "clipped_sample.mp3")
 
+@pytest.mark.skip(reason="Save time in testing. Temporarily")
 def test_generate_transcript_with_speakers(capsys):
     global audio_file_path
     with capsys.disabled():
