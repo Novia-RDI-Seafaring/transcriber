@@ -21,3 +21,12 @@ def file_has_content(file_path):
     
     # Check if the content is not empty
     return content.strip() != ""
+
+def get_content(maybe_path):
+    if os.path.exists(maybe_path):
+        with open(maybe_path, 'r') as file:
+            content = file.read()
+    else:
+        content = maybe_path # it is not a path, it is the content
+
+    return content

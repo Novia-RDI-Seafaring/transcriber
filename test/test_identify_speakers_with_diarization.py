@@ -1,6 +1,6 @@
 from interview_transcriber.video_downloader import download_youtube_video, video_folder_exists
 from interview_transcriber.video_converter import convert_video_to_mp3, there_is_a_converted_audio_file, create_audiofilepath
-from interview_transcriber.speaker_identifier import identify_speakers
+from interview_transcriber.speaker_identifier_diarization import identify_speakers_with_diarization
 import os
 import warnings
 import pytest
@@ -59,11 +59,11 @@ def test_identify_speakers(capsys):
         project_directory = os.path.dirname(current_directory)
         audio_file_path = os.path.join(project_directory, "data", "audio", "sample", "clipped_sample.mp3")
 
-        result, output_file, speaker_clips = identify_speakers(audio_file_path)
+        result, output_file, speaker_clips = identify_speakers_with_diarization(audio_file_path)
 
         print(speaker_clips)
 
-        #result = identify_speakers(audio_path)
+        #result = identify_speakers_with_diarization(audio_path)
         assert result is not None
         assert output_file is not None
         assert speaker_clips is not None

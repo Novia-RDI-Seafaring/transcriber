@@ -3,17 +3,43 @@ from pydub import AudioSegment
 from pydub.silence import split_on_silence
 from interview_transcriber.file_utils import ensure_path_exists
 from interview_transcriber.subtitle_time_shifter import shift_time_in_subtitle
+from .file_utils import get_content
+from faster_whisper import WhisperModel
 
 import math, os, re
 
-def transcribe_audio(audio_path, response_format="vtt", save_output=False):
-    client = OpenAI()
-    audio_file = open(audio_path, "rb")
-    transcript = client.audio.translations.create(
-        model="whisper-1",
-        file=audio_file,
-        response_format=response_format
-    )
+def seconds_to_vtt_time(seconds):
+    """Converts a float `seconds` to a string in VTT time format HH:MM:SS.mmm"""
+    millis = int(seconds * 1000)
+    hours, remainder = divmod(millis, 3600000)
+    minutes, remainder = divmod(remainder, 60000)
+    seconds, milliseconds = divmod(remainder, 1000)
+    return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
+
+def transcribe_audio(audio_path, context_string=None, use_local=False, response_format="vtt", save_output=False):
+    if use_local:
+        model_size = "large-v3"
+        model = WhisperModel(model_size, device="auto")
+        
+        segments, info = model.transcribe(audio_path, beam_size=5, condition_on_previous_text=False)
+        if format == "vtt":
+            transcript = "WEBVTT\n\n"
+            transcript += "\n\n".join([f"{seconds_to_vtt_time(segment.start)} --> {seconds_to_vtt_time(segment.end)}\n{segment.text.strip()}" for segment in segments])
+        elif format == "txt":
+            transcript = " ".join([segment.text for segment in segments])
+        elif format == "json":
+            transcript = {"segments": segments}
+        else:
+            transcript = segments
+    else:
+        client = OpenAI()
+        audio_file = open(audio_path, "rb")
+        transcript = client.audio.translations.create(
+            model="whisper-1",
+            file=audio_file,
+            response_format=response_format,
+            prompt = context_string
+        )
 
     if save_output:
         output_filename = audio_path.replace("/audio/", f"/{response_format}/").replace(".mp3", f".{response_format}")
@@ -28,7 +54,7 @@ def transcribe_audio(audio_path, response_format="vtt", save_output=False):
         return transcript
 
 
-def transcribe(audio_path, chunk_length_ms=10*60*1000, progress=None, progress_text="Transcribing", start_progress=0.3, end_progress=0.8):
+def transcribe(audio_path, context_string=None, use_local=False, chunk_length_ms=10*60*1000, progress=None, progress_text="Transcribing", start_progress=0.3, end_progress=0.8):
     """
     Splits a long audio file into manageable chunks, transcribes each, and then combines the results.
     
@@ -63,8 +89,8 @@ def transcribe(audio_path, chunk_length_ms=10*60*1000, progress=None, progress_t
         chunk_file = f"temp_chunk_{i}.mp3"
         chunk.export(chunk_file, format="mp3")
         
-        transcription = "NOTE This is where the audio was splitted, for processing it in chunks..."
-        transcription += transcribe_audio(chunk_file)
+        #transcription = "NOTE This is where the audio was splitted, for processing it in chunks..."
+        transcription = str(transcribe_audio(chunk_file, context_string, use_local)).replace("WEBVTT\n\n", "").strip()
         
         adjusted_transcription = shift_time_in_subtitle(transcription, start)
         transcriptions.append(adjusted_transcription)
@@ -73,7 +99,7 @@ def transcribe(audio_path, chunk_length_ms=10*60*1000, progress=None, progress_t
         os.remove(chunk_file)
     
     # Combine the transcriptions
-    combined_transcription = "\n".join(transcriptions)
+    combined_transcription = "\n\n".join(transcriptions)
     
     return combined_transcription
 
@@ -85,12 +111,7 @@ import os
 import re
 
 def combine_subtitle_lines(vtt_content_or_path):
-    # If the input is a file path, read the content of the file
-    if os.path.exists(vtt_content_or_path):
-        with open(vtt_content_or_path, 'r') as file:
-            vtt_content = file.read()
-    else:
-        vtt_content = vtt_content_or_path
+    vtt_content = get_content(vtt_content_or_path)
 
     # Split the VTT content into individual subtitle blocks
     subtitle_blocks = vtt_content.strip().split('\n\n')
@@ -168,13 +189,14 @@ def combine_subtitle_lines(vtt_content_or_path):
 
     # Append the last combined subtitle block to the list
     #combined_subtitle_lines.append(f"{start_time} --> {end_time}\n{combined_text}")
-    combined_subtitle_lines.append({
-        "start": time_to_seconds(start_time),
-        "end": time_to_seconds(end_time),
-        "duration": time_to_seconds(end_time) - time_to_seconds(start_time),
-        "text": combined_text,
-        "vtt": f"{start_time} --> {end_time}\n{combined_text}"
-    })
+    if start_time is not None:
+        combined_subtitle_lines.append({
+            "start": time_to_seconds(start_time),
+            "end": time_to_seconds(end_time),
+            "duration": time_to_seconds(end_time) - time_to_seconds(start_time),
+            "text": combined_text,
+            "vtt": f"{start_time} --> {end_time}\n{combined_text}"
+        })
     # Add "WEBVTT" at the beginning of the combined subtitle text
     combined_subtitle_text = "WEBVTT\n\n" + "\n\n".join(map(lambda x:x["vtt"], combined_subtitle_lines))
 

@@ -35,8 +35,10 @@ def extract_audio_segment(input_file, output_file, start_time, segment_duration)
         '-ss', str(start_time),  # Start time
         '-i', input_file,  # Input audio file
         '-t', str(segment_duration),  # Duration of the segment
-        '-c', 'copy',  # Copy audio codec
-        output_file,  # Output file path
+        '-acodec', 'pcm_s16le',  # Set audio codec to PCM 16-bit
+        '-ar', '16000',  # Set sample rate to 16000 Hz
+        '-ac', '1',  # Set audio channels to 1 (mono)
+        output_file  # Output file path
     ]
     print(ffmpeg_command)
 

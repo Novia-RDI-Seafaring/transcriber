@@ -1,3 +1,17 @@
+
+```bash
+conda create --name nemo python==3.10.12
+conda activate nemo
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+
+```
+follow instruction sat https://github.com/NVIDIA/NeMo
+
+
+
+
+
+
 ```
 from youtube_subtitles import download_youtube_video, convert_video_to_mp3, \
     generate_corrected_transcript, transcribe_audio, translate_transcript

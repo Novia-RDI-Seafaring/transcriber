@@ -1,7 +1,23 @@
+tokenizers==0.15.2
+av==11.0.0
+faster-whisper==1.0.1
+transformers<4.20
+
 pytube
 tqdm
 pydub
-openai==1.16.0
+umap-learn
+openai==1.17.0
+numpy==1.26
 pytest
-pyannote.audio
 webvtt-py
+numpy
+nemo_toolkit
+torch==2.2.2
+torchaudio==2.2.2
+playsound
+
+#git+https://github.com/NVIDIA/NeMo.git@main#egg=nemo_toolkit[asr]
+
+# Install torchaudio manually
+# Run: pip install torchaudio -f https://download.pytorch.org/whl/torch_stable.html

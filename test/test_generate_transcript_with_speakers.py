@@ -1,6 +1,6 @@
-from interview_transcriber.speaker_identifier import identify_speakers
+from interview_transcriber.speaker_identifier_diarization import identify_speakers_with_diarization
 from interview_transcriber import transcribe_audio
-from interview_transcriber.speaker_identifier import generate_transcript_with_speakers
+from interview_transcriber.speaker_identifier_diarization import generate_transcript_with_speakers
 from interview_transcriber.audio_transcriber import combine_subtitle_lines
 
 import os
@@ -21,7 +21,7 @@ def test_generate_transcript_with_speakers(capsys):
         assert subtitle_file is not None
         print(subtitle_file)
 
-        diarization, output_file, speaker_clips = identify_speakers(audio_file_path)
+        diarization, output_file, speaker_clips = identify_speakers_with_diarization(audio_file_path)
 
         generate_transcript_with_speakers(subtitle_file, diarization, output_file_path)
         assert os.path.exists(output_file_path)
