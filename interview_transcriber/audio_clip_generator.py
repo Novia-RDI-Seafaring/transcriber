@@ -2,6 +2,7 @@ import os
 import subprocess
 
 def generate_audio_clips(subtitle_data, audio_file, output_dir):
+    print("subtitle_data", subtitle_data)
     # Create the output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 

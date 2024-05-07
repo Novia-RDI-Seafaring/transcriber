@@ -28,7 +28,7 @@ with gr.Blocks() as app:
         Downloads a video from YouTube, converts it to MP3, and transcribes it.
         """
         progress(0, desc="Downloading video")
-        video_path, video_title = download_youtube_video(video_url)
+        video_path, video_title, id = download_youtube_video(video_url)
 
         progress(0.2, desc=f"{video_title} - Making audio version")
         audio_path = convert_video_to_mp3(video_path)

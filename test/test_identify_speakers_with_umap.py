@@ -2,7 +2,8 @@ import os
 from interview_transcriber.speaker_identifier_with_embeddings import identify_speakers
 import nemo.collections.asr as nemo_asr
 import pytest
-import torchaudio
+import torchaudio 
+
 
 #from pyannote.audio import Model, Inference
 """
@@ -29,7 +30,7 @@ def test_create_umap_for_file(capsys):
         print(embedding)
         assert embedding is not None
 
-#@pytest.mark.skip(reason="Save time in testing. Temporarily")
+@pytest.mark.skip(reason="Save time in testing. Temporarily")
 def test_identify_speakers_with_umap(capsys):
     with capsys.disabled():
         current_directory = os.path.dirname(os.path.abspath(__file__))

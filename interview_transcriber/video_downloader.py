@@ -24,12 +24,14 @@ def download_youtube_video(video_url, folder_path='data/video/youtube'):
 
         folder = os.path.join(folder_path, id)    
         ensure_path_exists(folder)
-
+        print("i have ensured that the folder exists")
         # Get the highest resolution stream available
         video_stream = yt.streams.get_lowest_resolution()
-        
+        print("i have a video stream, will download...")
+
         # Download the video
         video_path = video_stream.download(output_path=folder)
+        print(f"i have downloaded the video to {folder} the path is {video_path}")
         return video_path, video_stream.title, id
 
         print(f"Video downloaded successfully: {video_stream.title}")
