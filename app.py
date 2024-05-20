@@ -166,7 +166,6 @@ def handle_name_submission(n_clicks, speakers, selectedData, name):
         return speakers, figure
     return speakers, dash.no_update
 
-
 @app.callback(
     Output('transcript', "children"),
     Input('speaker-labels', 'data'),
@@ -186,13 +185,17 @@ def update_transcript(speakers, selected_clip, selected_data):
 
     p = []
     for index, clip in enumerate(audio_clips):
+        background_color = get_color_from_label(speakers[index])
+        style = {
+            'backgroundColor': f'rgba({int(background_color[1:3], 16)}, {int(background_color[3:5], 16)}, {int(background_color[5:7], 16)}, 0.5)'
+        }
         if index == point_index:
             p.append(
-                html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")])
+                html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")], style=style)
             )
         else:
             p.append(
-                html.P(f"{speakers[index]}: {clip['text']}")
+                html.P(f"{speakers[index]}: {clip['text']}", style=style)
             )
 
     return p
