@@ -62,25 +62,43 @@ fig_settings = {
     "title": dict(font=dict(size=14)),
 }
 
+# Initialize a global color map
+global_color_map = {}
+color_palette = [
+    "#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A",
+    "#19D3F3", "#FF6692", "#B6E880", "#FF97FF", "#FECB52",
+    "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
+    "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF"
+]
+next_color_index = 0
+
 def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels):
+    global global_color_map, next_color_index, color_palette
+    
+    # Update the global color map with any new speakers
     unique_speakers = np.unique(speaker_labels)
-    speaker_color_map = {speaker: idx for idx, speaker in enumerate(unique_speakers)}
-    colors = [speaker_color_map[label] for label in speaker_labels]
+    for speaker in unique_speakers:
+        if speaker not in global_color_map:
+            if next_color_index < len(color_palette):
+                global_color_map[speaker] = color_palette[next_color_index]
+                next_color_index += 1
+            else:
+                global_color_map[speaker] = "#000000"  # Default color if we run out of predefined colors
+    
+    colors = [global_color_map[label] for label in speaker_labels]
 
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
             x=EMBEDDINGS_UMAP[:, 0],
             y=EMBEDDINGS_UMAP[:, 1],
-            hovertext=[audio_clips[i]["text"][:20 - 3] + "..." for i in np.arange(EMBEDDINGS_UMAP.shape[0])],
+            hovertext=[audio_clips[i]["text"][:20 - 3] + "..." for i in range(EMBEDDINGS_UMAP.shape[0])],
             hoverinfo="text",
             mode='markers',
             marker=dict(
                 size=10,
                 opacity=0.8,
                 color=colors,
-                colorbar={'thickness': 20},
-                colorscale='Viridis'
             ),
             showlegend=False)
     )
@@ -88,6 +106,7 @@ def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels):
     fig.update_yaxes(showticklabels=False, automargin=False)
     fig.update_layout(dragmode="lasso")
     return fig
+
 
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
@@ -119,7 +138,6 @@ app.layout = html.Div([
     prevent_initial_call=True
 )
 def store_selected_data(selectedData):
-    print(f"Storing selected data: {selectedData}")  # Debugging line
     return selectedData
 
 @app.callback(
@@ -129,7 +147,6 @@ def store_selected_data(selectedData):
     prevent_initial_call=True
 )
 def update_ui_for_naming(selectedData):
-    print(f"Updating dynamic content with selected data: {selectedData}")  # Debugging line
     if selectedData:
         return html.Div([
             dcc.Input(id='name-input', type='text', placeholder='Enter name...'),
@@ -139,6 +156,7 @@ def update_ui_for_naming(selectedData):
 
 @app.callback(
     Output('speaker-labels', "data"),
+    Output('scatter-plot', 'figure'),
     Input('submit-button', 'n_clicks'),
     State('speaker-labels', 'data'),
     State('selected-speakers', "data"),
@@ -146,13 +164,24 @@ def update_ui_for_naming(selectedData):
     prevent_initial_call=True
 )
 def handle_name_submission(n_clicks, speakers, selectedData, name):
-    print(f"Handling name submission: {name}, {selectedData}")  # Debugging line
+    global global_color_map, next_color_index, color_palette
+    
     if name and selectedData:
+        if name not in global_color_map:
+            if next_color_index < len(color_palette):
+                global_color_map[name] = color_palette[next_color_index]
+                next_color_index += 1
+            else:
+                global_color_map[name] = "#000000"  # Default color if we run out of predefined colors
+        
         indices = [point['pointIndex'] for point in selectedData['points']]
         for idx in indices:
-            speakers[idx] = name
-        return speakers
-    return speakers
+            speakers[idx] = name  # Update the speaker labels
+        
+        figure = get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speakers)  # Update the figure with new labels
+        return speakers, figure
+    return speakers, dash.no_update
+
 
 @app.callback(
     Output('transcript', "children"),
