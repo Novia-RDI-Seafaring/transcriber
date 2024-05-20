@@ -5,7 +5,7 @@ import argparse
 
 def main(audio_file_path, output_file_path, context_file_path=None, use_local=False, language=None):
     # Read the context file if provided
-    context_string = None
+    context_string = ""
     if context_file_path:
         with open(context_file_path, 'r') as file:
             context_string = file.read()

@@ -1,8 +1,7 @@
 import plotly.graph_objs as go
 import dash
-from dash import dcc, html, State, Patch
+from dash import dcc, html, State
 from dash.dependencies import Input, Output
-import dash_player as dp
 import base64
 import numpy as np
 import dash_dangerously_set_inner_html
@@ -10,7 +9,6 @@ import sys
 import os
 import pickle
 import shutil
-
 
 from interview_transcriber.speaker_identifier_with_embeddings import identify_speakers
 
@@ -21,44 +19,33 @@ else:
     print("usage: python app.py path/to/audio/file language")
     sys.exit(1)
 
-
 def load_or_identify_speakers(audio_file_path):
-    # Construct the path for the cached file
     cache_file_path = audio_file_path + ".datacache.pickle"
-
-    # Check if the cached file exists
     if os.path.exists(cache_file_path):
-        # Load the cached data
         with open(cache_file_path, 'rb') as cache_file:
             subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = pickle.load(cache_file)
         print("Loaded data from cache.")
     else:
-        # Run the function to identify speakers and generate data
-        subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = identify_speakers(audio_file_path)
-
-        # Save the data to a cache file for future use
+        subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = identify_speakers(audio_file_path, use_local=True)
         with open(cache_file_path, 'wb') as cache_file:
             pickle.dump((subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP), cache_file)
         print("Processed data and saved to cache.")
 
     for s in subtitle_data:
         source_path = s["clip"]
-        destination =  "assets/" + source_path
-        os.makedirs(os.path.dirname(destination), exist_ok=True)  # create the directory if it doesn't exist
-        shutil.copy(source_path, destination)  # copy the file to the destination
-
+        destination = "assets/" + source_path
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        shutil.copy(source_path, destination)
+    
     return subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP
 
-
 audio_clips, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = load_or_identify_speakers(audio_file_path)
-
 
 HEIGHT = 300
 margin = dict(l=60, r=20, t=20, b=50, pad=0)
 
 fig_settings = {
-    "height": HEIGHT,  #
-    # "width": HEIGHT,
+    "height": HEIGHT,
     "paper_bgcolor": "rgba(255, 255, 255, 0)",
     "margin": margin,
     "legend": dict(
@@ -75,164 +62,166 @@ fig_settings = {
     "title": dict(font=dict(size=14)),
 }
 
-
-# UMAP scatter figure
-def get_scatter_figure():
+def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels):
+    unique_speakers = np.unique(speaker_labels)
+    speaker_color_map = {speaker: idx for idx, speaker in enumerate(unique_speakers)}
+    colors = [speaker_color_map[label] for label in speaker_labels]
 
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
             x=EMBEDDINGS_UMAP[:, 0],
             y=EMBEDDINGS_UMAP[:, 1],
-            hovertext=[str(i) for i in np.arange(EMBEDDINGS_UMAP.shape[0])],
+            hovertext=[audio_clips[i]["text"][:20 - 3] + "..." for i in np.arange(EMBEDDINGS_UMAP.shape[0])],
             hoverinfo="text",
             mode='markers',
             marker=dict(
                 size=10,
                 opacity=0.8,
-                # colorbar={'thickness': 20}
+                color=colors,
+                colorbar={'thickness': 20},
+                colorscale='Viridis'
             ),
             showlegend=False)
     )
-    fig.update_xaxes(showticklabels=False, automargin=False),
-    fig.update_yaxes(showticklabels=False, automargin=False),
-    fig.update_layout(fig_settings, dragmode="lasso")
+    fig.update_xaxes(showticklabels=False, automargin=False)
+    fig.update_yaxes(showticklabels=False, automargin=False)
+    fig.update_layout(dragmode="lasso")
     return fig
 
-app = dash.Dash(__name__) 
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
-# App layout
 app.layout = html.Div([
-    html.Div([  # Row
-        html.Div([  # Column 1: Graph
+    html.Div([
+        html.Div([
             dcc.Graph(
                 id='scatter-plot',
                 config={'displayModeBar': False},
-                figure=get_scatter_figure()
+                figure=get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels)
             )
-        ], style={'width': '50%', 'display': 'inline-block', 'height': f'{HEIGHT}px'}),
-        html.Div([  # Column 2: Abstract
-            html.Div(id='speaker-clip-text', children="", style={'overflowY': 'scroll', 'height': f'{HEIGHT-50}px', 'vertical-align': 'top'}),
-
-        ], style={'width': '50%', 'display': 'inline-block', 'vertical-align': 'top'})
-    ]),   
-
-    html.Div([  # Row
-        html.Div([  # Column 1: Graph
-            html.Div(id='bottom-ui1', children="", style={'overflowY': 'scroll', 'height': f'{HEIGHT-50}px', 'vertical-align': 'top', 'position': 'absolute', 'top': '0'}),
-            html.Div(id='bottom-ui2', children="", style={'overflowY': 'scroll', 'height': f'{HEIGHT-50}px', 'vertical-align': 'top', 'position': 'absolute', 'top': '0'})        
-        ], style={'width': '50%', 'display': 'inline-block', 'height': f'{HEIGHT}px', "position": "relative"}),
-        html.Div([  # Column 2: 
-            html.H2(children="Transcript"),
-            html.Div(id='transcript', children="", style={'overflowY': 'scroll', 'height': f'{HEIGHT-50}px', 'vertical-align': 'top'})
-        ], style={'width': '50%', 'display': 'inline-block', 'vertical-align': 'top'}) 
-    ]),    
-
-], style={'backgroundColor':'white'})
+        ], style={'width': '100%', 'display': 'inline-block', 'height': f'{HEIGHT}px'}),
+        html.Div(id='dynamic-content', children="", style={'height': '50px', 'vertical-align': 'top', 'position': 'absolute', 'padding': '30px', 'width': '450px', 'top': f'{HEIGHT}px'}),
+        html.Div(id='bottom-ui1', children="", style={'height': f'{HEIGHT-50}px', 'vertical-align': 'top', 'padding': '30px', 'position': 'absolute', 'top': f'{HEIGHT+50}px'}),
+    ], style={'width': '50%', 'display': 'inline-block', 'height': '100vh', "position": "relative"}),
+    html.Div([
+        html.H2(children="Transcript"),
+        html.Div(id='transcript', children="", style={'vertical-align': 'top'})
+    ], style={'width': '50%', 'height': '90vh', 'display': 'inline-block', 'vertical-align': 'top', 'overflowY': 'scroll'}),
+    dcc.Store(id='speaker-labels', data=speaker_labels),
+    dcc.Store(id='selected-clip', data=None),
+    dcc.Store(id='selected-speakers', data=None),
+    dcc.Store(id='selected-data', data=None)  # Store for selection data
+], style={'backgroundColor': 'white'})
 
 @app.callback(
-    Output('speaker-clip-text', 'children'),
-    Input('scatter-plot', 'hoverData')
-)
-def on_hover(hover_data):
-
-    if hover_data is None:
-        return "Hover over a point to see the transcript."
-
-    # Get the index of the hovered point
-    point_index = hover_data['points'][0]['pointIndex']
-
-
-    child_html = [
-        html.H3(f"Hello there {point_index}"), # audio_clips
-        html.P([html.Strong(f"{speaker_labels[point_index]}:"), f"{audio_clips[point_index]['text']}" ])
-
-    ]
-
-    return child_html
-
-
-@app.callback(
-    Output('bottom-ui1', 'children',  allow_duplicate=True,),
-    Input("scatter-plot", "selectedData"),
+    Output('selected-data', 'data'),
+    Input('scatter-plot', 'selectedData'),
     prevent_initial_call=True
-
 )
-def on_selection(select_data):
-    print(select_data)
+def store_selected_data(selectedData):
+    print(f"Storing selected data: {selectedData}")  # Debugging line
+    return selectedData
 
-    child_html = html.Div([  # Column 1: Graph
+@app.callback(
+    Output('dynamic-content', 'children'),
+    Output('selected-speakers', 'data'),
+    Input('selected-data', 'data'),
+    prevent_initial_call=True
+)
+def update_ui_for_naming(selectedData):
+    print(f"Updating dynamic content with selected data: {selectedData}")  # Debugging line
+    if selectedData:
+        return html.Div([
+            dcc.Input(id='name-input', type='text', placeholder='Enter name...'),
+            html.Button('Submit', id='submit-button', n_clicks=0)
+        ]), selectedData
+    return "No points selected.", selectedData
 
-        html.H3(f"Name the speakers"), # audio_clips
+@app.callback(
+    Output('speaker-labels', "data"),
+    Input('submit-button', 'n_clicks'),
+    State('speaker-labels', 'data'),
+    State('selected-speakers', "data"),
+    State('name-input', 'value'),
+    prevent_initial_call=True
+)
+def handle_name_submission(n_clicks, speakers, selectedData, name):
+    print(f"Handling name submission: {name}, {selectedData}")  # Debugging line
+    if name and selectedData:
+        indices = [point['pointIndex'] for point in selectedData['points']]
+        for idx in indices:
+            speakers[idx] = name
+        return speakers
+    return speakers
 
-        html.Div([ # Row
-            html.Div([ # Text input field
-                dcc.Input(
-                    id='name-input', 
-                    type='text', 
-                    placeholder='Enter name...', 
-                ),
-            ], style={'width': '80%', 'display': 'inline-block'}),
-            html.Div([ # Submit button
-                html.Button(
-                    'Submit', 
-                    id='submit-button', 
-                    n_clicks=0,
-                ),
-            ], style={'width': '20%', 'display': 'inline-block'}),
-        ], style={'width': '100%', 'height': '30px'}),
+@app.callback(
+    Output('transcript', "children"),
+    Input('speaker-labels', 'data'),
+    Input('selected-clip', 'data'),
+    Input('selected-speakers', 'data'),
+    prevent_initial_call=True
+)
+def update_transcript(speakers, selected, click_data):
+    print("------------- updating transcript ---------------")
 
+    if click_data and 'points' in click_data and len(click_data['points']) > 0:
+        point_index = click_data['points'][0]['pointIndex']
+    else:
+        point_index = 0
 
-    ], style={'width': '500px', 'margin-left': '50px'}),
+    p = []
+    for index, clip in enumerate(audio_clips):
+        if index == point_index:
+            p.append(
+                html.P([html.B(f"{speakers[index]}: {clip['text']}", id="highlighted")])
+            )
+        else:
+            p.append(
+                html.P(f"{speakers[index]}: {clip['text']}")
+            )
 
-
-    return child_html
+    return p
 
 @app.callback(
     Output('bottom-ui1', 'children',  allow_duplicate=True),
     Input('scatter-plot', 'clickData'),
     prevent_initial_call=True
-
-) 
+)
 def on_click(click_data):
-
     if click_data is None:
         return ""
-
-    # Get the index of the hovered point
     point_index = click_data['points'][0]['pointIndex']
-    media_url = app.get_asset_url(
-        audio_clips[point_index]['clip']
-    )
-    print(point_index)
+    media_url = app.get_asset_url(audio_clips[point_index]['clip'])
     encoded_sound = "data:audio/mp3;base64," + base64.b64encode(open(audio_clips[point_index]['clip'], 'rb').read()).decode('utf-8')
-
-
     child_html = [
-        html.H3(f"Listen to {point_index}"), # audio_clips
-
+        html.H3(f"Listen to {point_index}"),
         dash_dangerously_set_inner_html.DangerouslySetInnerHTML(f'''
-            <div id="audiodiv" >
+            <div id="audiodiv">
                 <audio id="audio_player" src="{encoded_sound}"  controls="controls" autobuffer="autobuffer" autoplay="autoplay">
                 </audio>
             </div>
-        '''),                          
-        html.P([html.Strong("Clip:"), f"{media_url}" ]),
-        html.P([html.Strong("Text:"), f"{audio_clips[point_index]['text']}" ]),
+        '''),
+        html.P([html.Strong("Clip:"), f"{media_url}"]),
+        html.P([html.Strong("Text:"), f"{audio_clips[point_index]['text']}"]),
+        html.Button('Highlight text', id='highlight', n_clicks=0)
     ]
-
     return child_html
-"""
-@app.callback(
-    Output('bottom-ui1', 'children',  allow_duplicate=True),
-    Input("name-input", "value"),
-    Input("scatter-plot", "selectedData"),
 
-    prevent_initial_call=True
+app.clientside_callback(
+    """function (i) {
+        var scrollableDiv = document.getElementById('transcript');
+        var highlighted = document.getElementById('highlighted');
 
-) 
-def on_click_name(new_name, click_data):
-    print(new_name, click_data)
-    return []"""
+        // Calculate the position to scroll
+        var scrollTop = highlighted.offsetTop - scrollableDiv.offsetTop - (scrollableDiv.clientHeight / 2) + (highlighted.clientHeight / 2);
 
-app.run_server(debug=True)
+        // Scroll to the calculated position
+        scrollableDiv.scrollTop = scrollTop;
+
+        return window.dash_clientside.no_update
+    }""", Output('selected-clip', 'data'),
+    Input('highlight','n_clicks'),
+)
+
+if __name__ == '__main__':
+    app.run_server(debug=True, port=8051)
