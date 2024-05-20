@@ -1,7 +1,7 @@
 import plotly.graph_objs as go
 import dash
 from dash import dcc, html, State
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, ALL
 import base64
 import numpy as np
 import dash_dangerously_set_inner_html
@@ -97,7 +97,7 @@ def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels):
             showlegend=False)
     )
     fig.update_xaxes(showticklabels=False, automargin=False)
-    fig.update_yaxes(showticklabels=False, automargin=False)
+    fig.update_yaxes(showticklabels=False, automargin=False)  # Corrected line
     fig.update_layout(dragmode="lasso")
     return fig
 
@@ -127,8 +127,7 @@ app.layout = html.Div([
 
 @app.callback(
     Output('selected-data', 'data'),
-    Input('scatter-plot', 'selectedData'),
-    prevent_initial_call=True
+    Input('scatter-plot', 'selectedData')
 )
 def store_selected_data(selectedData):
     return selectedData
@@ -136,8 +135,7 @@ def store_selected_data(selectedData):
 @app.callback(
     Output('dynamic-content', 'children'),
     Output('selected-speakers', 'data'),
-    Input('selected-data', 'data'),
-    prevent_initial_call=True
+    Input('selected-data', 'data')
 )
 def update_ui_for_naming(selectedData):
     if selectedData:
@@ -153,8 +151,7 @@ def update_ui_for_naming(selectedData):
     Input('submit-button', 'n_clicks'),
     State('speaker-labels', 'data'),
     State('selected-speakers', "data"),
-    State('name-input', 'value'),
-    prevent_initial_call=True
+    State('name-input', 'value')
 )
 def handle_name_submission(n_clicks, speakers, selectedData, name):
     if name and selectedData:
@@ -168,50 +165,53 @@ def handle_name_submission(n_clicks, speakers, selectedData, name):
 
 @app.callback(
     Output('transcript', "children"),
+    Output('bottom-ui1', 'children'),
+    Output('selected-clip', 'data', allow_duplicate=True ),
     Input('speaker-labels', 'data'),
-    Input('selected-clip', 'data'),
-    Input('selected-data', 'data'),
-    prevent_initial_call=True
-)
-def update_transcript(speakers, selected_clip, selected_data):
-    print("------------- updating transcript ---------------")
+    Input('scatter-plot', 'clickData'),
+    Input({'type': 'transcript-p', 'index': ALL}, 'n_clicks'),
+    State('scatter-plot', 'selectedData'),
+    State({'type': 'transcript-p', 'index': ALL}, 'id'),
+    prevent_initial_call=True   
 
-    if selected_clip is not None:
-        point_index = selected_clip
-    elif selected_data and 'points' in selected_data and len(selected_data['points']) > 0:
+)
+def update_transcript_and_audio(speakers, click_data, n_clicks, selected_data, ids):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        return dash.no_update, dash.no_update, dash.no_update
+
+    triggered_prop_id = ctx.triggered[0]['prop_id']
+
+    if 'scatter-plot.clickData' in triggered_prop_id:
+        point_index = click_data['points'][0]['pointIndex']
+    elif 'transcript-p' in triggered_prop_id:
+        clicked_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        point_index = int(eval(clicked_id)['index'])
+    elif 'scatter-plot.selectedData' in triggered_prop_id and selected_data:
         point_index = selected_data['points'][0]['pointIndex']
     else:
         point_index = 0
 
-    p = []
+    transcript = []
     for index, clip in enumerate(audio_clips):
         background_color = get_color_from_label(speakers[index])
         style = {
-            'backgroundColor': f'rgba({int(background_color[1:3], 16)}, {int(background_color[3:5], 16)}, {int(background_color[5:7], 16)}, 0.5)'
+            'backgroundColor': f'rgba({int(background_color[1:3], 16)}, {int(background_color[3:5], 16)}, {int(background_color[5:7], 16)}, 0.5)',
+            'cursor': 'pointer'
         }
         if index == point_index:
-            p.append(
-                html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")], style=style)
+            transcript.append(
+                html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")], style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
             )
         else:
-            p.append(
-                html.P(f"{speakers[index]}: {clip['text']}", style=style)
+            transcript.append(
+                html.P(f"{speakers[index]}: {clip['text']}", style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
             )
 
-    return p
-
-@app.callback(
-    Output('bottom-ui1', 'children', allow_duplicate=True),
-    Input('scatter-plot', 'clickData'),
-    prevent_initial_call=True
-)
-def on_click(click_data):
-    if click_data is None:
-        return ""
-    point_index = click_data['points'][0]['pointIndex']
     media_url = app.get_asset_url(audio_clips[point_index]['clip'])
     encoded_sound = "data:audio/mp3;base64," + base64.b64encode(open(audio_clips[point_index]['clip'], 'rb').read()).decode('utf-8')
-    child_html = [
+    audio_player = [
         html.H3(f"Listen to {point_index}"),
         dash_dangerously_set_inner_html.DangerouslySetInnerHTML(f'''
             <div id="audiodiv">
@@ -223,7 +223,14 @@ def on_click(click_data):
         html.P([html.Strong("Text:"), f"{audio_clips[point_index]['text']}"]),
         html.Button('Highlight text', id='highlight', n_clicks=0)
     ]
-    return child_html
+
+    figure = get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speakers)
+    figure.update_traces(
+        marker=dict(size=10, opacity=0.8, color=[get_color_from_label(speakers[i]) for i in range(len(speakers))]),
+        selectedpoints=[point_index]
+    )
+
+    return transcript, audio_player, point_index
 
 app.clientside_callback(
     """
@@ -247,8 +254,9 @@ app.clientside_callback(
         return window.dash_clientside.no_update;
     }
     """,
-    Output('selected-clip', 'data'),
+    Output('selected-clip', 'data', allow_duplicate=True),
     Input('highlight', 'n_clicks'),
+    prevent_initial_call=True
 )
 
 if __name__ == '__main__':
