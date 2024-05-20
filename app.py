@@ -9,24 +9,36 @@ import sys
 import os
 import pickle
 import shutil
+import random
 
 from interview_transcriber.speaker_identifier_with_embeddings import identify_speakers
 
-if len(sys.argv) > 2:
+def parse_arguments():
+    if len(sys.argv) < 4:
+        print("usage: python app.py path/to/audio/file language --use_local=true/false")
+        sys.exit(1)
     audio_file_path = sys.argv[1]
     language = sys.argv[2]
-else:
-    print("usage: python app.py path/to/audio/file language")
-    sys.exit(1)
+    use_local_flag = sys.argv[3]
+    if use_local_flag == "--use_local=true":
+        use_local = True
+    elif use_local_flag == "--use_local=false":
+        use_local = False
+    else:
+        print("Error: The third argument must be --use_local=true or --use_local=false.")
+        sys.exit(1)
+    return audio_file_path, language, use_local
 
-def load_or_identify_speakers(audio_file_path):
+audio_file_path, language, use_local = parse_arguments()
+
+def load_or_identify_speakers(audio_file_path, use_local):
     cache_file_path = audio_file_path + ".datacache.pickle"
     if os.path.exists(cache_file_path):
         with open(cache_file_path, 'rb') as cache_file:
             subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = pickle.load(cache_file)
         print("Loaded data from cache.")
     else:
-        subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = identify_speakers(audio_file_path, use_local=True)
+        subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = identify_speakers(audio_file_path, use_local=use_local)
         with open(cache_file_path, 'wb') as cache_file:
             pickle.dump((subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP), cache_file)
         print("Processed data and saved to cache.")
@@ -39,7 +51,7 @@ def load_or_identify_speakers(audio_file_path):
     
     return subtitle_data, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP
 
-audio_clips, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = load_or_identify_speakers(audio_file_path)
+audio_clips, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = load_or_identify_speakers(audio_file_path, use_local)
 
 HEIGHT = 300
 margin = dict(l=60, r=20, t=20, b=50, pad=0)
@@ -62,30 +74,12 @@ fig_settings = {
     "title": dict(font=dict(size=14)),
 }
 
-# Initialize a global color map
-global_color_map = {}
-color_palette = [
-    "#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A",
-    "#19D3F3", "#FF6692", "#B6E880", "#FF97FF", "#FECB52",
-    "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
-    "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF"
-]
-next_color_index = 0
+def get_color_from_label(label):
+    random.seed(hash(label))
+    return "#{:02x}{:02x}{:02x}".format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
 def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels):
-    global global_color_map, next_color_index, color_palette
-    
-    # Update the global color map with any new speakers
-    unique_speakers = np.unique(speaker_labels)
-    for speaker in unique_speakers:
-        if speaker not in global_color_map:
-            if next_color_index < len(color_palette):
-                global_color_map[speaker] = color_palette[next_color_index]
-                next_color_index += 1
-            else:
-                global_color_map[speaker] = "#000000"  # Default color if we run out of predefined colors
-    
-    colors = [global_color_map[label] for label in speaker_labels]
+    colors = [get_color_from_label(label) for label in speaker_labels]
 
     fig = go.Figure()
     fig.add_trace(
@@ -107,7 +101,6 @@ def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels):
     fig.update_layout(dragmode="lasso")
     return fig
 
-
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
 app.layout = html.Div([
@@ -119,7 +112,7 @@ app.layout = html.Div([
                 figure=get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels)
             )
         ], style={'width': '100%', 'display': 'inline-block', 'height': f'{HEIGHT}px'}),
-        html.Div(id='dynamic-content', children="", style={'height': '50px', 'vertical-align': 'top', 'position': 'absolute', 'padding': '30px', 'width': '450px', 'top': f'{HEIGHT}px'}),
+        html.Div(id='dynamic-content', children="", style={'height': '50px', 'vertical-align': 'top', 'position': 'absolute', 'padding': '30px', 'width': '450px', 'left': '50px', 'top': f'{HEIGHT+50}px'}),
         html.Div(id='bottom-ui1', children="", style={'height': f'{HEIGHT-50}px', 'vertical-align': 'top', 'padding': '30px', 'position': 'absolute', 'top': f'{HEIGHT+50}px'}),
     ], style={'width': '50%', 'display': 'inline-block', 'height': '100vh', "position": "relative"}),
     html.Div([
@@ -164,16 +157,7 @@ def update_ui_for_naming(selectedData):
     prevent_initial_call=True
 )
 def handle_name_submission(n_clicks, speakers, selectedData, name):
-    global global_color_map, next_color_index, color_palette
-    
     if name and selectedData:
-        if name not in global_color_map:
-            if next_color_index < len(color_palette):
-                global_color_map[name] = color_palette[next_color_index]
-                next_color_index += 1
-            else:
-                global_color_map[name] = "#000000"  # Default color if we run out of predefined colors
-        
         indices = [point['pointIndex'] for point in selectedData['points']]
         for idx in indices:
             speakers[idx] = name  # Update the speaker labels
@@ -187,14 +171,16 @@ def handle_name_submission(n_clicks, speakers, selectedData, name):
     Output('transcript', "children"),
     Input('speaker-labels', 'data'),
     Input('selected-clip', 'data'),
-    Input('selected-speakers', 'data'),
+    Input('selected-data', 'data'),
     prevent_initial_call=True
 )
-def update_transcript(speakers, selected, click_data):
+def update_transcript(speakers, selected_clip, selected_data):
     print("------------- updating transcript ---------------")
 
-    if click_data and 'points' in click_data and len(click_data['points']) > 0:
-        point_index = click_data['points'][0]['pointIndex']
+    if selected_clip is not None:
+        point_index = selected_clip
+    elif selected_data and 'points' in selected_data and len(selected_data['points']) > 0:
+        point_index = selected_data['points'][0]['pointIndex']
     else:
         point_index = 0
 
@@ -202,7 +188,7 @@ def update_transcript(speakers, selected, click_data):
     for index, clip in enumerate(audio_clips):
         if index == point_index:
             p.append(
-                html.P([html.B(f"{speakers[index]}: {clip['text']}", id="highlighted")])
+                html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")])
             )
         else:
             p.append(
@@ -212,7 +198,7 @@ def update_transcript(speakers, selected, click_data):
     return p
 
 @app.callback(
-    Output('bottom-ui1', 'children',  allow_duplicate=True),
+    Output('bottom-ui1', 'children', allow_duplicate=True),
     Input('scatter-plot', 'clickData'),
     prevent_initial_call=True
 )
@@ -226,7 +212,7 @@ def on_click(click_data):
         html.H3(f"Listen to {point_index}"),
         dash_dangerously_set_inner_html.DangerouslySetInnerHTML(f'''
             <div id="audiodiv">
-                <audio id="audio_player" src="{encoded_sound}"  controls="controls" autobuffer="autobuffer" autoplay="autoplay">
+                <audio id="audio_player" src="{encoded_sound}" controls="controls" autobuffer="autobuffer" autoplay="autoplay">
                 </audio>
             </div>
         '''),
@@ -237,9 +223,17 @@ def on_click(click_data):
     return child_html
 
 app.clientside_callback(
-    """function (i) {
+    """
+    function (n_clicks) {
+        if (n_clicks === 0) return window.dash_clientside.no_update;
+
+        var highlightedElements = document.querySelectorAll('[id^="highlighted-"]');
+        if (highlightedElements.length === 0) return window.dash_clientside.no_update;
+
+        var highlighted = highlightedElements[highlightedElements.length - 1];
         var scrollableDiv = document.getElementById('transcript');
-        var highlighted = document.getElementById('highlighted');
+
+        if (!highlighted || !scrollableDiv) return window.dash_clientside.no_update;
 
         // Calculate the position to scroll
         var scrollTop = highlighted.offsetTop - scrollableDiv.offsetTop - (scrollableDiv.clientHeight / 2) + (highlighted.clientHeight / 2);
@@ -247,9 +241,11 @@ app.clientside_callback(
         // Scroll to the calculated position
         scrollableDiv.scrollTop = scrollTop;
 
-        return window.dash_clientside.no_update
-    }""", Output('selected-clip', 'data'),
-    Input('highlight','n_clicks'),
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('selected-clip', 'data'),
+    Input('highlight', 'n_clicks'),
 )
 
 if __name__ == '__main__':
