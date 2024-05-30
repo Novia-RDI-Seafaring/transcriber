@@ -215,6 +215,9 @@ def update_transcript_and_audio(speakers, highlighted_point, n_clicks, selected_
     if not ctx.triggered:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
+    if selected_data is not None and "points" in selected_data and len(selected_data['points']) > 0:
+        return dash.no_update, None, dash.no_update, dash.no_update
+
     triggered_prop_id = ctx.triggered[0]['prop_id']
     print("bar", triggered_prop_id)
 
@@ -234,23 +237,24 @@ def update_transcript_and_audio(speakers, highlighted_point, n_clicks, selected_
         point_index = None
 
     transcript = []
+    for index, clip in enumerate(audio_clips):
+        background_color = get_color_from_label(speakers[index])
+        style = {
+            'backgroundColor': f'rgba({int(background_color[1:3], 16)}, {int(background_color[3:5], 16)}, {int(background_color[5:7], 16)}, 0.5)',
+            'cursor': 'pointer',
+            'margin' : '0px',
+            'padding': '10px'
+        }
+        if point_index is not None and index == point_index:
+            transcript.append(
+                html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")], style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
+            )
+        else:
+            transcript.append(
+                html.P(f"{speakers[index]}: {clip['text']}", style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
+            )
+
     if point_index is not None:
-        for index, clip in enumerate(audio_clips):
-            background_color = get_color_from_label(speakers[index])
-            style = {
-                'backgroundColor': f'rgba({int(background_color[1:3], 16)}, {int(background_color[3:5], 16)}, {int(background_color[5:7], 16)}, 0.5)',
-                'cursor': 'pointer',
-                'margin' : '0px',
-                'padding': '10px'
-            }
-            if index == point_index:
-                transcript.append(
-                    html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")], style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
-                )
-            else:
-                transcript.append(
-                    html.P(f"{speakers[index]}: {clip['text']}", style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
-                )
 
         media_url = app.get_asset_url(audio_clips[point_index]['clip'])
         encoded_sound = "data:audio/mp3;base64," + base64.b64encode(open(audio_clips[point_index]['clip'], 'rb').read()).decode('utf-8')
@@ -271,7 +275,7 @@ def update_transcript_and_audio(speakers, highlighted_point, n_clicks, selected_
 
         return transcript, audio_player, selected_indices, figure
 
-    return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    return transcript, dash.no_update, dash.no_update, dash.no_update
 
 app.clientside_callback(
     """
