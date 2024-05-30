@@ -161,17 +161,13 @@ def store_highlighted_point(clickData):
     prevent_initial_call=True
 )
 def update_ui_for_naming(selectedData, highlighted_point):
-    print("1",selectedData)
-    print("1",highlighted_point)
-    if selectedData is None and highlighted_point is not None:
+    if (selectedData is None or "points" in selectedData and len(selectedData['points']) == 0) and highlighted_point is not None:
         selectedData = {
             'points': [{'pointIndex': highlighted_point[0]}]
         }
-    print("2",selectedData)
-    print("2",highlighted_point)
     if selectedData and 'points' in selectedData:
         return html.Div([
-            dcc.Input(id='name-input', type='text', placeholder='Enter name...'),
+            dcc.Input(id='name-input', type='text', placeholder='Enter name...', value=''),
             html.Button('Submit', id='submit-button', n_clicks=0)
         ]), selectedData
     return "No points selected.", selectedData
