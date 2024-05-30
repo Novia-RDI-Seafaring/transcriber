@@ -54,12 +54,10 @@ def load_or_identify_speakers(audio_file_path, use_local):
 audio_clips, embeddings, speaker_labels, k, kluster_labels, EMBEDDINGS_UMAP = load_or_identify_speakers(audio_file_path, use_local)
 
 HEIGHT = 300
-margin = dict(l=60, r=20, t=20, b=50, pad=0)
 
 fig_settings = {
     "height": HEIGHT,
     "paper_bgcolor": "rgba(255, 255, 255, 0)",
-    "margin": margin,
     "legend": dict(
         x=1, y=1,
         xanchor="right",
@@ -78,8 +76,18 @@ def get_color_from_label(label):
     random.seed(hash(label))
     return "#{:02x}{:02x}{:02x}".format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
-def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels):
+def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels, selected_indices=None):
     colors = [get_color_from_label(label) for label in speaker_labels]
+
+    marker_settings = dict(
+        size=[15 if i in selected_indices else 10 for i in range(len(audio_clips))] if selected_indices else 10,
+        opacity=0.8,
+        color=colors,
+        line=dict(
+            width=[3 if i in selected_indices else 0 for i in range(len(audio_clips))] if selected_indices else 0,
+            color='black'
+        )
+    )
 
     fig = go.Figure()
     fig.add_trace(
@@ -89,15 +97,13 @@ def get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels):
             hovertext=[audio_clips[i]["text"][:20 - 3] + "..." for i in range(EMBEDDINGS_UMAP.shape[0])],
             hoverinfo="text",
             mode='markers',
-            marker=dict(
-                size=10,
-                opacity=0.8,
-                color=colors,
-            ),
-            showlegend=False)
+            marker=marker_settings,
+            selectedpoints=selected_indices,
+            showlegend=False
+        )
     )
     fig.update_xaxes(showticklabels=False, automargin=False)
-    fig.update_yaxes(showticklabels=False, automargin=False)  # Corrected line
+    fig.update_yaxes(showticklabels=False, automargin=False)
     fig.update_layout(dragmode="lasso")
     return fig
 
@@ -111,34 +117,59 @@ app.layout = html.Div([
                 config={'displayModeBar': False},
                 figure=get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speaker_labels)
             )
-        ], style={'width': '100%', 'display': 'inline-block', 'height': f'{HEIGHT}px'}),
-        html.Div(id='dynamic-content', children="", style={'height': '50px', 'vertical-align': 'top', 'position': 'absolute', 'padding': '30px', 'width': '450px', 'left': '50px', 'top': f'{HEIGHT+50}px'}),
-        html.Div(id='bottom-ui1', children="", style={'height': f'{HEIGHT-50}px', 'vertical-align': 'top', 'padding': '30px', 'position': 'absolute', 'top': f'{HEIGHT+50}px'}),
+        ], style={'width': '100%', 'display': 'inline-block', 'height': f'{HEIGHT}px', 'marginTop': '-30px'}),
+        html.Div(id='dynamic-content', children="", style={'zIndex':'100', 'height': '50px', 'verticalAlign': 'top', 'position': 'absolute', 'padding': '30px', 'width': '450px', 'left': '50px', 'top': f'{HEIGHT+50}px'}),
+        html.Div(id='bottom-ui1', children="", style={'height': f'{HEIGHT-50}px', 'verticalAlign': 'top',
+            'padding': '30px', 'position': 'absolute', 'top': f'{HEIGHT+100}px', 'left': '50px', 'width': '70%'}),
     ], style={'width': '50%', 'display': 'inline-block', 'height': '100vh', "position": "relative"}),
     html.Div([
         html.H2(children="Transcript"),
-        html.Div(id='transcript', children="", style={'vertical-align': 'top'})
-    ], style={'width': '50%', 'height': '90vh', 'display': 'inline-block', 'vertical-align': 'top', 'overflowY': 'scroll'}),
+        html.Div(id='transcript', children="", style={'verticalAlign': 'top'})
+    ], style={'width': '50%', 'height': '90vh', 'display': 'inline-block', 'verticalAlign': 'top', 'overflowY': 'scroll'}),
     dcc.Store(id='speaker-labels', data=speaker_labels),
     dcc.Store(id='selected-clip', data=None),
     dcc.Store(id='selected-speakers', data=None),
-    dcc.Store(id='selected-data', data=None)  # Store for selection data
+    dcc.Store(id='selected-data', data=None),  # Store for selection data
+    dcc.Store(id='highlighted-point', data=None)  # Store for highlighted point
 ], style={'backgroundColor': 'white'})
 
 @app.callback(
     Output('selected-data', 'data'),
-    Input('scatter-plot', 'selectedData')
+    Input('scatter-plot', 'selectedData'),
+    prevent_initial_call=True
 )
 def store_selected_data(selectedData):
     return selectedData
 
 @app.callback(
+    Output('highlighted-point', 'data'),
+    Input('scatter-plot', 'clickData'),
+    prevent_initial_call=True
+)
+def store_highlighted_point(clickData):
+    if clickData:
+        point_index = clickData['points'][0]['pointIndex']
+        return [point_index]
+    return None
+
+@app.callback(
     Output('dynamic-content', 'children'),
     Output('selected-speakers', 'data'),
-    Input('selected-data', 'data')
+    Input('selected-data', 'data'),
+    Input('highlighted-point', 'data'),
+
+    prevent_initial_call=True
 )
-def update_ui_for_naming(selectedData):
-    if selectedData:
+def update_ui_for_naming(selectedData, highlighted_point):
+    print("1",selectedData)
+    print("1",highlighted_point)
+    if selectedData is None and highlighted_point is not None:
+        selectedData = {
+            'points': [{'pointIndex': highlighted_point[0]}]
+        }
+    print("2",selectedData)
+    print("2",highlighted_point)
+    if selectedData and 'points' in selectedData:
         return html.Div([
             dcc.Input(id='name-input', type='text', placeholder='Enter name...'),
             html.Button('Submit', id='submit-button', n_clicks=0)
@@ -147,60 +178,67 @@ def update_ui_for_naming(selectedData):
 
 @app.callback(
     Output('speaker-labels', "data"),
-    Output('scatter-plot', 'figure'),
+    Output('scatter-plot', 'figure', allow_duplicate=True),
     Input('submit-button', 'n_clicks'),
     State('speaker-labels', 'data'),
     State('selected-speakers', "data"),
-    State('name-input', 'value')
+    State('name-input', 'value'),
+    State('highlighted-point', 'data'),
+    prevent_initial_call=True
 )
-def handle_name_submission(n_clicks, speakers, selectedData, name):
+def handle_name_submission(n_clicks, speakers, selectedData, name, highlighted_point):
     if name and selectedData:
         indices = [point['pointIndex'] for point in selectedData['points']]
         for idx in indices:
             speakers[idx] = name  # Update the speaker labels
-        
-        figure = get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speakers)  # Update the figure with new labels
+
+        figure = get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speakers, selected_indices=highlighted_point)  # Update the figure with new labels
         return speakers, figure
     return speakers, dash.no_update
 
 @app.callback(
     Output('transcript', "children"),
     Output('bottom-ui1', 'children'),
-    Output('selected-clip', 'data', allow_duplicate=True ),
+    Output('highlighted-point', 'data', allow_duplicate=True),
+    Output('scatter-plot', 'figure', allow_duplicate=True),
     Input('speaker-labels', 'data'),
-    Input('scatter-plot', 'clickData'),
+    Input('highlighted-point', 'data'),
     Input({'type': 'transcript-p', 'index': ALL}, 'n_clicks'),
     State('scatter-plot', 'selectedData'),
     State({'type': 'transcript-p', 'index': ALL}, 'id'),
-    prevent_initial_call=True   
-
+    prevent_initial_call=True
 )
-def update_transcript_and_audio(speakers, click_data, n_clicks, selected_data, ids):
+def update_transcript_and_audio(speakers, highlighted_point, n_clicks, selected_data, ids):
     ctx = dash.callback_context
 
     if not ctx.triggered:
-        return dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     triggered_prop_id = ctx.triggered[0]['prop_id']
 
-    if 'scatter-plot.clickData' in triggered_prop_id:
-        point_index = click_data['points'][0]['pointIndex']
+    if 'highlighted-point.data' in triggered_prop_id:
+        selected_indices = highlighted_point
+        point_index = highlighted_point[0] if highlighted_point else None
     elif 'transcript-p' in triggered_prop_id:
         clicked_id = ctx.triggered[0]['prop_id'].split('.')[0]
         point_index = int(eval(clicked_id)['index'])
+        selected_indices = [point_index]
     elif 'scatter-plot.selectedData' in triggered_prop_id and selected_data:
-        point_index = selected_data['points'][0]['pointIndex']
+        selected_indices = [point['pointIndex'] for point in selected_data['points']]
+        point_index = selected_indices[0] if selected_indices else None
     else:
-        point_index = 0
-
+        selected_indices = None
+        point_index = None
     transcript = []
     for index, clip in enumerate(audio_clips):
         background_color = get_color_from_label(speakers[index])
         style = {
             'backgroundColor': f'rgba({int(background_color[1:3], 16)}, {int(background_color[3:5], 16)}, {int(background_color[5:7], 16)}, 0.5)',
-            'cursor': 'pointer'
+            'cursor': 'pointer',
+            'margin' : '0px',
+            'padding': '10px'
         }
-        if index == point_index:
+        if point_index is not None and index == point_index:
             transcript.append(
                 html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")], style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
             )
@@ -208,30 +246,28 @@ def update_transcript_and_audio(speakers, click_data, n_clicks, selected_data, i
             transcript.append(
                 html.P(f"{speakers[index]}: {clip['text']}", style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
             )
+            
+    if point_index is not None:
 
-    media_url = app.get_asset_url(audio_clips[point_index]['clip'])
-    encoded_sound = "data:audio/mp3;base64," + base64.b64encode(open(audio_clips[point_index]['clip'], 'rb').read()).decode('utf-8')
-    audio_player = [
-        html.H3(f"Listen to {point_index}"),
-        dash_dangerously_set_inner_html.DangerouslySetInnerHTML(f'''
-            <div id="audiodiv">
-                <audio id="audio_player" src="{encoded_sound}" controls="controls" autobuffer="autobuffer" autoplay="autoplay">
-                </audio>
-            </div>
-        '''),
-        html.P([html.Strong("Clip:"), f"{media_url}"]),
-        html.P([html.Strong("Text:"), f"{audio_clips[point_index]['text']}"]),
-        html.Button('Highlight text', id='highlight', n_clicks=0)
-    ]
+        media_url = app.get_asset_url(audio_clips[point_index]['clip'])
+        encoded_sound = "data:audio/mp3;base64," + base64.b64encode(open(audio_clips[point_index]['clip'], 'rb').read()).decode('utf-8')
+        audio_player = [
+            html.H3(f"Listen to {point_index}"),
+            dash_dangerously_set_inner_html.DangerouslySetInnerHTML(f'''
+                <div id="audiodiv">
+                    <audio id="audio_player" src="{encoded_sound}" controls="controls" autobuffer="autobuffer" autoplay="autoplay">
+                    </audio>
+                </div>
+            '''),
+            html.P([html.Strong("Clip:"), f"{media_url}"]),
+            html.P([html.Strong("Text:"), f"{audio_clips[point_index]['text']}"]),
+            html.Button('Highlight text', id='highlight', n_clicks=0)
+        ]
 
-    figure = get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speakers)
-    figure.update_traces(
-        marker=dict(size=10, opacity=0.8, color=[get_color_from_label(speakers[i]) for i in range(len(speakers))]),
-        selectedpoints=[point_index]
-    )
+        figure = get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speakers, selected_indices=selected_indices)
 
-    return transcript, audio_player, point_index
-
+        return transcript, audio_player, selected_indices, figure
+    return transcript, dash.no_update, selected_indices, dash.no_update
 app.clientside_callback(
     """
     function (n_clicks) {
