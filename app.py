@@ -147,6 +147,7 @@ def store_selected_data(selectedData):
     prevent_initial_call=True
 )
 def store_highlighted_point(clickData):
+    print(clickData)
     if clickData:
         point_index = clickData['points'][0]['pointIndex']
         return [point_index]
@@ -175,6 +176,7 @@ def update_ui_for_naming(selectedData, highlighted_point):
 @app.callback(
     Output('speaker-labels', "data"),
     Output('scatter-plot', 'figure', allow_duplicate=True),
+    Output('highlighted-point', 'data', allow_duplicate=True),
     Input('submit-button', 'n_clicks'),
     State('speaker-labels', 'data'),
     State('selected-speakers', "data"),
@@ -188,9 +190,12 @@ def handle_name_submission(n_clicks, speakers, selectedData, name, highlighted_p
         for idx in indices:
             speakers[idx] = name  # Update the speaker labels
 
+        # Clear the highlighted point after submission to avoid conflicts
+        highlighted_point = None
+
         figure = get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speakers, selected_indices=highlighted_point)  # Update the figure with new labels
-        return speakers, figure
-    return speakers, dash.no_update
+        return speakers, figure, highlighted_point
+    return speakers, dash.no_update, dash.no_update
 
 @app.callback(
     Output('transcript', "children"),
@@ -206,13 +211,15 @@ def handle_name_submission(n_clicks, speakers, selectedData, name, highlighted_p
 )
 def update_transcript_and_audio(speakers, highlighted_point, n_clicks, selected_data, ids):
     ctx = dash.callback_context
-
+    print("foo", highlighted_point)
     if not ctx.triggered:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
     triggered_prop_id = ctx.triggered[0]['prop_id']
+    print("bar", triggered_prop_id)
 
-    if 'highlighted-point.data' in triggered_prop_id:
+
+    if 'highlighted-point.data' in triggered_prop_id or 'speaker-labels.data' in triggered_prop_id:
         selected_indices = highlighted_point
         point_index = highlighted_point[0] if highlighted_point else None
     elif 'transcript-p' in triggered_prop_id:
@@ -225,25 +232,25 @@ def update_transcript_and_audio(speakers, highlighted_point, n_clicks, selected_
     else:
         selected_indices = None
         point_index = None
+
     transcript = []
-    for index, clip in enumerate(audio_clips):
-        background_color = get_color_from_label(speakers[index])
-        style = {
-            'backgroundColor': f'rgba({int(background_color[1:3], 16)}, {int(background_color[3:5], 16)}, {int(background_color[5:7], 16)}, 0.5)',
-            'cursor': 'pointer',
-            'margin' : '0px',
-            'padding': '10px'
-        }
-        if point_index is not None and index == point_index:
-            transcript.append(
-                html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")], style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
-            )
-        else:
-            transcript.append(
-                html.P(f"{speakers[index]}: {clip['text']}", style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
-            )
-            
     if point_index is not None:
+        for index, clip in enumerate(audio_clips):
+            background_color = get_color_from_label(speakers[index])
+            style = {
+                'backgroundColor': f'rgba({int(background_color[1:3], 16)}, {int(background_color[3:5], 16)}, {int(background_color[5:7], 16)}, 0.5)',
+                'cursor': 'pointer',
+                'margin' : '0px',
+                'padding': '10px'
+            }
+            if index == point_index:
+                transcript.append(
+                    html.P([html.B(f"{speakers[index]}: {clip['text']}", id=f"highlighted-{index}")], style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
+                )
+            else:
+                transcript.append(
+                    html.P(f"{speakers[index]}: {clip['text']}", style=style, id={'type': 'transcript-p', 'index': index}, n_clicks=0)
+                )
 
         media_url = app.get_asset_url(audio_clips[point_index]['clip'])
         encoded_sound = "data:audio/mp3;base64," + base64.b64encode(open(audio_clips[point_index]['clip'], 'rb').read()).decode('utf-8')
@@ -263,7 +270,9 @@ def update_transcript_and_audio(speakers, highlighted_point, n_clicks, selected_
         figure = get_scatter_figure(EMBEDDINGS_UMAP, audio_clips, speakers, selected_indices=selected_indices)
 
         return transcript, audio_player, selected_indices, figure
-    return transcript, dash.no_update, selected_indices, dash.no_update
+
+    return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
 app.clientside_callback(
     """
     function (n_clicks) {
