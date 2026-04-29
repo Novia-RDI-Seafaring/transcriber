@@ -10,7 +10,7 @@ export function Transcript() {
   const highlighted = useStore((s) => s.highlighted);
   const hovered = useStore((s) => s.hovered);
   const search = useStore((s) => s.search);
-  const setHighlighted = useStore((s) => s.setHighlighted);
+  const playSegment = useStore((s) => s.playSegment);
   const setHovered = useStore((s) => s.setHovered);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -63,7 +63,7 @@ export function Transcript() {
             <div
               key={i}
               data-segment-index={i}
-              onClick={() => setHighlighted(i)}
+              onClick={() => playSegment(i)}
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
               className={

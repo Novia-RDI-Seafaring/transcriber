@@ -36,7 +36,7 @@ export function Scatter() {
   const highlighted = useStore((s) => s.highlighted);
   const hovered = useStore((s) => s.hovered);
   const selected = useStore((s) => s.selected);
-  const setHighlighted = useStore((s) => s.setHighlighted);
+  const playSegment = useStore((s) => s.playSegment);
   const setHovered = useStore((s) => s.setHovered);
   const setSelected = useStore((s) => s.setSelected);
   const setSpeakers = useStore((s) => s.setSpeakers);
@@ -44,12 +44,12 @@ export function Scatter() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lassoIndices = useRef<number[]>([]);
   const handlersRef = useRef<{
-    setHighlighted: typeof setHighlighted;
+    playSegment: typeof playSegment;
     setHovered: typeof setHovered;
     setSelected: typeof setSelected;
     openRename: (idx: number[]) => void;
   }>({
-    setHighlighted,
+    playSegment,
     setHovered,
     setSelected,
     openRename: () => {},
@@ -95,7 +95,7 @@ export function Scatter() {
       const ev = e as PlotMouseEvent;
       const point = ev.points?.[0];
       const idx = point?.pointIndex;
-      if (typeof idx === "number") handlersRef.current.setHighlighted(idx);
+      if (typeof idx === "number") handlersRef.current.playSegment(idx);
     };
     const onHover = (e: unknown) => {
       const ev = e as PlotMouseEvent;
@@ -132,7 +132,7 @@ export function Scatter() {
   // Keep handler ref fresh without re-initializing the plot.
   useEffect(() => {
     handlersRef.current = {
-      setHighlighted,
+      playSegment,
       setHovered,
       setSelected,
       openRename: (idx) => {
@@ -141,7 +141,7 @@ export function Scatter() {
         setDraft("");
       },
     };
-  }, [setHighlighted, setHovered, setSelected]);
+  }, [playSegment, setHovered, setSelected]);
 
   // Restyle on highlighted / selected / labels changes — cheaper than rebuilding.
   useEffect(() => {

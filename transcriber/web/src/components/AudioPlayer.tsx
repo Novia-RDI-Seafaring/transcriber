@@ -21,6 +21,7 @@ export function AudioPlayer() {
   const speakers = useStore((s) => s.speakers);
   const highlighted = useStore((s) => s.highlighted);
   const setHighlighted = useStore((s) => s.setHighlighted);
+  const playRequestId = useStore((s) => s.playRequestId);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WaveSurfer | null>(null);
@@ -190,26 +191,32 @@ export function AudioPlayer() {
           if (ws.isPlaying()) ws.pause();
           else void ws.play();
         } else {
-          setHighlightedRef.current(i);
+          // Same path as a transcript / scatter / timeline click: ask
+          // the player to seek and play this segment.
+          useStore.getState().playSegment(i);
         }
       };
       region.on("click", handler);
     });
   }, [segments, speakers, colorMap, isReady]);
 
-  // React to highlighted changes: seek + emphasize + play.
+  // React to a play request: user clicked something. We seek + play.
+  // Natural playback advance bumps `highlighted` but NOT this counter,
+  // so the playhead is not yanked back to segment.start every boundary.
   useEffect(() => {
-    if (highlighted == null) return;
-    if (!segments || !segments[highlighted]) return;
+    if (playRequestId === 0) return;
+    const idx = useStore.getState().highlighted;
+    if (idx == null) return;
+    if (!segments || !segments[idx]) return;
     const ws = wsRef.current;
     if (!ws) return;
     if (!isReadyRef.current) {
-      pendingSeekRef.current = { index: highlighted, play: true };
+      pendingSeekRef.current = { index: idx, play: true };
       return;
     }
-    seekToSegment(highlighted, true);
+    seekToSegment(idx, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlighted, segments]);
+  }, [playRequestId, segments]);
 
   // Update region opacities when highlighted changes (without rebuilding).
   useEffect(() => {

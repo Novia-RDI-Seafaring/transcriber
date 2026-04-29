@@ -18,7 +18,7 @@ export function Timeline() {
   const speakers = useStore((s) => s.speakers);
   const highlighted = useStore((s) => s.highlighted);
   const hovered = useStore((s) => s.hovered);
-  const setHighlighted = useStore((s) => s.setHighlighted);
+  const playSegment = useStore((s) => s.playSegment);
   const setHovered = useStore((s) => s.setHovered);
 
   const colorMap = useMemo(() => assignColors(speakers), [speakers]);
@@ -63,7 +63,7 @@ export function Timeline() {
               stroke={isHl ? "#fafafa" : "transparent"}
               strokeWidth={isHl ? 1.5 : 0}
               style={{ cursor: "pointer", transition: "opacity 80ms" }}
-              onClick={() => setHighlighted(i)}
+              onClick={() => playSegment(i)}
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
             >

@@ -15,6 +15,15 @@ interface State {
   hovered: number | null;
   selected: Set<number>;
   search: string;
+  /**
+   * Monotonic counter bumped whenever the user explicitly asks the
+   * audio player to seek to a segment (transcript click, scatter click,
+   * timeline click, region click, keyboard nav). Natural playback
+   * advance does NOT bump it — that path only updates ``highlighted``.
+   * The ``AudioPlayer`` listens to this counter so that natural
+   * advance never re-triggers a seek.
+   */
+  playRequestId: number;
   // setters
   setJobs: (jobs: JobDTO[]) => void;
   upsertJob: (job: JobDTO) => void;
@@ -25,6 +34,11 @@ interface State {
   setResult: (r: ResultDTO | null) => void;
   setSpeakers: (s: string[]) => void;
   setHighlighted: (i: number | null) => void;
+  /**
+   * Set the highlight AND request the audio player to seek+play that
+   * segment. Use this for any user-initiated jump.
+   */
+  playSegment: (i: number) => void;
   setHovered: (i: number | null) => void;
   setSelected: (s: Set<number>) => void;
   clearSelected: () => void;
@@ -41,6 +55,7 @@ export const useStore = create<State>((set) => ({
   hovered: null,
   selected: new Set(),
   search: "",
+  playRequestId: 0,
   setJobs: (jobs) => set({ jobs }),
   upsertJob: (job) =>
     set((s) => {
@@ -63,6 +78,8 @@ export const useStore = create<State>((set) => ({
     set({ result: r, speakers: r ? r.speakers : [], highlighted: null, selected: new Set() }),
   setSpeakers: (speakers) => set({ speakers }),
   setHighlighted: (i) => set({ highlighted: i }),
+  playSegment: (i) =>
+    set((s) => ({ highlighted: i, playRequestId: s.playRequestId + 1 })),
   setHovered: (i) => set({ hovered: i }),
   setSelected: (s) => set({ selected: s }),
   clearSelected: () => set({ selected: new Set() }),

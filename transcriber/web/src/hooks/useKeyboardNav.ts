@@ -17,7 +17,7 @@ export function useKeyboardNav() {
     }
 
     function onKey(e: KeyboardEvent) {
-      const { result, highlighted, setHighlighted } = useStore.getState();
+      const { result, highlighted, setHighlighted, playSegment } = useStore.getState();
       if (!result) return;
 
       if (e.key === "/" && !isTextInput(e.target)) {
@@ -38,11 +38,11 @@ export function useKeyboardNav() {
       if (e.key === "ArrowDown") {
         e.preventDefault();
         const next = highlighted == null ? 0 : Math.min(last, highlighted + 1);
-        setHighlighted(next);
+        playSegment(next);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         const next = highlighted == null ? last : Math.max(0, highlighted - 1);
-        setHighlighted(next);
+        playSegment(next);
       } else if (e.key === " " && highlighted != null) {
         e.preventDefault();
         const audio = document.querySelector("audio");
