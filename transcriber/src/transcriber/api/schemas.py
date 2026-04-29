@@ -1,10 +1,4 @@
-"""JSON shapes returned by the API.
-
-These are plain dataclass-like models; we use FastAPI's automatic
-serialization with ``response_model`` so the frontend gets a stable
-schema. Keeping ``pydantic`` here is fine because FastAPI already pulls
-it in.
-"""
+"""JSON shapes returned by the API."""
 
 from __future__ import annotations
 
@@ -23,6 +17,7 @@ class SegmentDTO(BaseModel):
 
 
 class ResultDTO(BaseModel):
+    job_id: str
     audio_name: str
     audio_url: str | None
     duration: float
@@ -32,7 +27,7 @@ class ResultDTO(BaseModel):
 
 
 class LabelsUpdate(BaseModel):
-    """A partial update of speaker labels.
+    """Partial update of speaker labels.
 
     ``mapping`` renames every segment whose current speaker matches the
     key — i.e. it's a cluster-wide rename. ``per_index`` overrides
@@ -45,3 +40,29 @@ class LabelsUpdate(BaseModel):
 
 class LabelsState(BaseModel):
     speakers: list[str]
+
+
+class JobDTO(BaseModel):
+    id: str
+    source: str
+    title: str
+    backend: str
+    language: str
+    participants: int | None
+    status: str
+    stage: str | None
+    error: str | None
+    duration_seconds: float | None
+    n_segments: int | None
+    n_speakers: int | None
+    created_at: str
+    updated_at: str
+    completed_at: str | None
+
+
+class CreateJobRequest(BaseModel):
+    source: str
+    title: str | None = None
+    backend: str = "openai"
+    language: str = "en"
+    participants: int | None = None

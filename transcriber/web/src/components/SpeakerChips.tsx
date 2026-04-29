@@ -11,12 +11,13 @@ interface Props {
 export function SpeakerChips({ uniqueSpeakers, colorMap }: Props) {
   const speakers = useStore((s) => s.speakers);
   const setSpeakers = useStore((s) => s.setSpeakers);
+  const jobId = useStore((s) => s.result?.job_id ?? null);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
   async function commit(oldName: string) {
     const next = draft.trim();
-    if (!next || next === oldName) {
+    if (!next || next === oldName || !jobId) {
       setEditing(null);
       return;
     }
@@ -24,7 +25,7 @@ export function SpeakerChips({ uniqueSpeakers, colorMap }: Props) {
     setSpeakers(optimistic);
     setEditing(null);
     try {
-      const updated = await postLabels({
+      const updated = await postLabels(jobId, {
         mapping: { [oldName]: next },
         per_index: {},
       });

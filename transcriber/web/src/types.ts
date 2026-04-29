@@ -10,6 +10,7 @@ export interface SegmentDTO {
 }
 
 export interface ResultDTO {
+  job_id: string;
   audio_name: string;
   audio_url: string | null;
   duration: number;
@@ -25,4 +26,32 @@ export interface LabelsState {
 export interface LabelsUpdate {
   mapping: Record<string, string>;
   per_index: Record<number, string>;
+}
+
+export type JobStatus = "pending" | "running" | "complete" | "failed";
+
+export interface JobDTO {
+  id: string;
+  source: string;
+  title: string;
+  backend: string;
+  language: string;
+  participants: number | null;
+  status: JobStatus;
+  stage: string | null;
+  error: string | null;
+  duration_seconds: number | null;
+  n_segments: number | null;
+  n_speakers: number | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface CreateJobRequest {
+  source: string;
+  title?: string;
+  backend?: string;
+  language?: string;
+  participants?: number | null;
 }

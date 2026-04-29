@@ -181,13 +181,15 @@ export function Scatter() {
     if (!name) return;
     const indices = lassoIndices.current;
     if (!indices.length) return;
+    const jobId = useStore.getState().result?.job_id;
+    if (!jobId) return;
     const next = [...speakers];
     for (const i of indices) next[i] = name;
     setSpeakers(next);
     try {
       const per_index: Record<number, string> = {};
       for (const i of indices) per_index[i] = name;
-      const updated = await postLabels({ mapping: {}, per_index });
+      const updated = await postLabels(jobId, { mapping: {}, per_index });
       setSpeakers(updated.speakers);
     } catch (err) {
       console.error(err);

@@ -57,10 +57,10 @@ def make_timeline(
             x=durations,
             base=starts,
             orientation="h",
-            marker=dict(
-                color=colors,
-                line=dict(color="black", width=line_widths),
-            ),
+            marker={
+                "color": colors,
+                "line": {"color": "black", "width": line_widths},
+            },
             customdata=list(range(len(segments))),
             hovertext=hover,
             hoverinfo="text",
@@ -69,7 +69,7 @@ def make_timeline(
     )
     fig.update_layout(
         height=height,
-        margin=dict(l=10, r=10, t=10, b=30),
+        margin={"l": 10, "r": 10, "t": 10, "b": 30},
         bargap=0,
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",

@@ -158,13 +158,13 @@ def download(
 @app.command("serve")
 def serve_command(
     source: Annotated[
-        str,
+        str | None,
         typer.Argument(
             metavar="AUDIO_OR_URL",
-            help="Local audio file or a YouTube URL.",
+            help="Optional starter job: a local audio file or a YouTube URL.",
         ),
-    ],
-    backend: Annotated[str, typer.Option(help="local or openai.")] = "local",
+    ] = None,
+    backend: Annotated[str, typer.Option(help="local or openai.")] = "openai",
     language: Annotated[str, typer.Option()] = "en",
     participants: Annotated[int | None, typer.Option()] = None,
     host: Annotated[str, typer.Option(help="Bind address.")] = "127.0.0.1",
@@ -178,24 +178,25 @@ def serve_command(
         ),
     ] = None,
 ) -> None:
-    """Run the pipeline (cached) and serve the FastAPI + React frontend."""
+    """Serve the FastAPI + React frontend.
+
+    With no argument, the server starts empty and you add jobs through
+    the sidebar. With a URL or path, it enqueues that as the first job.
+    """
     configure_logging("INFO")
-    audio = _resolve_audio(source, work_dir=work_dir)
-    cfg = _build_config(
-        backend=backend,
-        language=language,
-        participants=participants,
-        chunk_seconds=600,
-        work_dir=work_dir,
-        no_cache=False,
-        context="",
-    )
-    result = run_pipeline(audio, config=cfg)
     from transcriber.api.server import run as run_api
 
     dist = web_dist or _default_web_dist()
-    labels_path = work_dir / "labels" / f"{result.metadata.get('audio_hash', 'default')}.json"
-    run_api(result, host=host, port=port, web_dist=dist, labels_path=labels_path)
+    run_api(
+        work_dir=work_dir,
+        host=host,
+        port=port,
+        web_dist=dist,
+        starter_source=source,
+        starter_backend=backend,
+        starter_language=language,
+        starter_participants=participants,
+    )
 
 
 def _default_web_dist() -> Path | None:

@@ -42,19 +42,20 @@ export function Header() {
             id="transcript-search"
           />
         </div>
-        <ExportMenu />
+        <ExportMenu jobId={result?.job_id ?? null} />
       </div>
     </header>
   );
 }
 
-function ExportMenu() {
+function ExportMenu({ jobId }: { jobId: string | null }) {
+  if (!jobId) return null;
   return (
     <div className="flex items-center overflow-hidden rounded-md border border-zinc-800">
       {(["txt", "vtt", "srt"] as const).map((fmt) => (
         <a
           key={fmt}
-          href={transcriptUrl(fmt)}
+          href={transcriptUrl(jobId, fmt)}
           download={`transcript.${fmt}`}
           className="flex h-8 items-center gap-1.5 border-r border-zinc-800 bg-zinc-900 px-2.5 text-xs uppercase text-zinc-300 last:border-r-0 hover:bg-zinc-800"
           title={`Download ${fmt.toUpperCase()}`}
