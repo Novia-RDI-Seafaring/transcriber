@@ -32,7 +32,7 @@ def test_long_audio_is_split_and_offsets_applied():
     backend = _FakeTranscriber()
     with (
         patch("transcriber.transcribe.chunking.probe_duration", return_value=1500.0),
-        patch("transcriber.transcribe.chunking.extract_clip", return_value=Path("/tmp/c.mp3")),
+        patch("transcriber.transcribe.chunking.extract_clip", return_value=Path("/tmp/c.wav")),
     ):
         words = transcribe_chunked(backend, Path("/tmp/x.mp3"), chunk_seconds=600)
 
@@ -43,3 +43,27 @@ def test_long_audio_is_split_and_offsets_applied():
     assert starts == [0.0, 600.0, 1200.0]
     ends = [w.end for w in words]
     assert ends == [0.5, 600.5, 1200.5]
+
+
+def test_chunk_files_are_wav_not_mp3():
+    """Regression: chunks were written as ``.mp3`` while the codec was
+    ``pcm_s16le``, which ffmpeg refuses (`Invalid audio stream` /
+    `Could not write header`). They must end in ``.wav``."""
+    backend = _FakeTranscriber()
+    seen: list[Path] = []
+
+    def _record(audio_path, out_path, *, start, duration, **kwargs):
+        seen.append(out_path)
+        return out_path
+
+    with (
+        patch("transcriber.transcribe.chunking.probe_duration", return_value=1500.0),
+        patch(
+            "transcriber.transcribe.chunking.extract_clip",
+            side_effect=_record,
+        ),
+    ):
+        transcribe_chunked(backend, Path("/tmp/x.mp3"), chunk_seconds=600)
+
+    assert seen, "extract_clip should have been called"
+    assert all(p.suffix == ".wav" for p in seen), [p.name for p in seen]

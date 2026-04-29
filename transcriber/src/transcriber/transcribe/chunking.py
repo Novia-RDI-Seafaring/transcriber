@@ -46,7 +46,12 @@ def transcribe_chunked(
         for i in range(n_chunks):
             start = i * chunk_seconds
             length = min(chunk_seconds, duration - start)
-            chunk_file = tmp_path / f"chunk_{i:03d}.mp3"
+            # WAV (PCM 16-bit, 16 kHz mono) keeps the chunk frame-accurate
+            # via re-encode (-ss is honored exactly) and stays well under
+            # OpenAI Whisper's 25 MB upload cap for a 10 min chunk
+            # (600 s × 32 kB/s ≈ 19 MB). Earlier versions named the file
+            # ``.mp3`` which clashes with the PCM codec we ask for.
+            chunk_file = tmp_path / f"chunk_{i:03d}.wav"
             extract_clip(
                 audio_path,
                 chunk_file,
