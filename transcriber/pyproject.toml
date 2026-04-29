@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "transcriber"
+version = "0.1.0"
+description = "Transcribe interviews and identify speakers via embedding clustering, with an interactive UI for relabeling."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Christoffer Björkskog" }]
+keywords = ["transcription", "whisper", "speaker-diarization", "interview", "dash"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+dependencies = [
+    "numpy>=1.26",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.30"]
+local = ["faster-whisper>=1.0"]
+embed = ["nemo-toolkit[asr]>=1.23", "torch>=2.2", "torchaudio>=2.2"]
+cluster = ["scikit-learn>=1.4", "umap-learn>=0.5"]
+youtube = ["yt-dlp>=2024.4.0"]
+ui = [
+    "dash>=2.16",
+    "plotly>=5.20",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+]
+all = [
+    "transcriber[openai,local,embed,cluster,youtube,ui]",
+]
+
+[project.scripts]
+transcriber = "transcriber.cli:app"
+
+[project.urls]
+Repository = "https://github.com/anthropics/transcriber"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/transcriber"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers"]
+markers = [
+    "slow: marks tests as slow (heavy models, network)",
+    "gpu: marks tests requiring a GPU",
+    "network: marks tests requiring network access",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM", "C4"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
