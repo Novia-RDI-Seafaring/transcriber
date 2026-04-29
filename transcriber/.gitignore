@@ -14,3 +14,7 @@ build/
 *.srt
 .cache/
 .transcriber-cache/
+demo-cache/
+.playwright-cli/
+docs-screenshot-*.png
+node_modules/

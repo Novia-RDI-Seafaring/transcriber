@@ -155,6 +155,69 @@ def download(
     typer.echo(f"{result.title}\n{result.audio_path}")
 
 
+@app.command("serve")
+def serve_command(
+    source: Annotated[
+        str,
+        typer.Argument(
+            metavar="AUDIO_OR_URL",
+            help="Local audio file or a YouTube URL.",
+        ),
+    ],
+    backend: Annotated[str, typer.Option(help="local or openai.")] = "local",
+    language: Annotated[str, typer.Option()] = "en",
+    participants: Annotated[int | None, typer.Option()] = None,
+    host: Annotated[str, typer.Option(help="Bind address.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="HTTP port.")] = 8000,
+    work_dir: Annotated[Path, typer.Option()] = Path(".transcriber-cache"),
+    web_dist: Annotated[
+        Path | None,
+        typer.Option(
+            "--web-dist",
+            help="Path to a built React frontend (web/dist). Default: transcriber/web/dist alongside the source tree.",
+        ),
+    ] = None,
+) -> None:
+    """Run the pipeline (cached) and serve the FastAPI + React frontend."""
+    configure_logging("INFO")
+    audio = _resolve_audio(source, work_dir=work_dir)
+    cfg = _build_config(
+        backend=backend,
+        language=language,
+        participants=participants,
+        chunk_seconds=600,
+        work_dir=work_dir,
+        no_cache=False,
+        context="",
+    )
+    result = run_pipeline(audio, config=cfg)
+    from transcriber.api.server import run as run_api
+
+    dist = web_dist or _default_web_dist()
+    labels_path = work_dir / "labels" / f"{result.metadata.get('audio_hash', 'default')}.json"
+    run_api(result, host=host, port=port, web_dist=dist, labels_path=labels_path)
+
+
+def _default_web_dist() -> Path | None:
+    """Locate the built React app shipped alongside the source tree.
+
+    Layout: ``<repo>/transcriber/src/transcriber/cli.py`` and
+    ``<repo>/transcriber/web/dist`` — so we walk three levels up from
+    this file (transcriber -> src -> transcriber-package-root).
+    """
+    here = Path(__file__).resolve()
+    candidates = [
+        here.parent.parent.parent / "web" / "dist",  # development checkout
+        here.parent / "web" / "dist",  # installed wheel (if we ever ship it)
+    ]
+    for c in candidates:
+        if c.is_dir():
+            log.info("serving frontend from %s", c)
+            return c
+    log.warning("no built frontend found; tried: %s", [str(c) for c in candidates])
+    return None
+
+
 @app.command("ui")
 def ui_command(
     source: Annotated[

@@ -36,13 +36,17 @@ ui = [
     "dash>=2.16",
     "plotly>=5.20",
 ]
+api = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.4",
 ]
 all = [
-    "transcriber[openai,local,embed,cluster,youtube,ui]",
+    "transcriber[openai,local,embed,cluster,youtube,ui,api]",
 ]
 
 [project.scripts]

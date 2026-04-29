@@ -1,15 +1,16 @@
 # transcriber
 
 Transcribe interviews, identify speakers from voice embeddings, and
-relabel them interactively.
+relabel them interactively in a React web UI.
 
 The pipeline takes an audio file (or a YouTube URL), produces word-level
 timestamps with Whisper, groups words into sentence segments, extracts a
 short audio clip per segment, embeds each clip with NVIDIA NeMo TitaNet,
 clusters the embeddings on a UMAP projection, and emits a transcript
-labeled with `Speaker 1`, `Speaker 2`, …. A Dash UI lets you lasso-select
-points in the projection and rename clusters with the speakers' real
-names.
+labeled with `Speaker 1`, `Speaker 2`, …. The web UI lets you lasso a
+cluster, rename it inline, hear individual segments, and search the
+transcript — all synchronized across a UMAP scatter, a Gantt-style
+timeline, and a continuous waveform with one region per segment.
 
 ## Install
 
@@ -19,7 +20,8 @@ uv pip install "transcriber[local]"     # + faster-whisper backend
 uv pip install "transcriber[openai]"    # + OpenAI Whisper API backend
 uv pip install "transcriber[cluster]"   # + scikit-learn / UMAP
 uv pip install "transcriber[embed]"     # + NeMo TitaNet speaker embedder
-uv pip install "transcriber[ui]"        # + Dash UI
+uv pip install "transcriber[ui]"        # + (legacy) Dash UI
+uv pip install "transcriber[api]"       # + FastAPI backend (powers the React UI)
 uv pip install "transcriber[youtube]"   # + yt-dlp downloader
 uv pip install "transcriber[all]"       # everything
 ```
@@ -36,7 +38,9 @@ For local development:
 git clone <repo>
 cd transcriber
 uv venv
-uv pip install -e ".[dev,cluster,ui]"
+uv pip install -e ".[dev,cluster,api,openai,embed,youtube]"
+# build the React frontend once so `transcriber serve` can serve it
+(cd web && pnpm install && pnpm build)
 ```
 
 ## CLI
@@ -48,15 +52,54 @@ transcriber transcribe path/to/audio.mp3
 # Specify number of speakers, language, output format
 transcriber transcribe interview.mp3 --participants 3 --language sv --format vtt
 
-# Use the OpenAI API instead of the local model
+# OpenAI Whisper API instead of the local model
 transcriber transcribe interview.mp3 --backend openai
 
 # Pull audio from YouTube
 transcriber download https://www.youtube.com/watch?v=...
 
-# Launch the relabeling UI on http://127.0.0.1:8051
+# Run pipeline + serve the React UI on http://127.0.0.1:8000
+transcriber serve interview.mp3 --participants 3
+transcriber serve "https://www.youtube.com/watch?v=..." --backend openai --participants 3
+
+# Legacy Dash UI on http://127.0.0.1:8051 (still works)
 transcriber ui interview.mp3 --participants 2
 ```
+
+`transcriber serve` accepts the same `AUDIO_OR_URL` argument as
+`transcribe`. URLs are downloaded once into `<work-dir>/youtube/<id>/`
+and reused.
+
+## Web UI
+
+`transcriber serve` runs uvicorn + the FastAPI backend, and serves the
+built React frontend from `web/dist`. The UI gives you:
+
+- a UMAP scatter where each dot is one segment, colored by cluster;
+- a continuous audio waveform with one **region** per segment, colored
+  by speaker — click a region or scrub to play any part;
+- a Gantt-style timeline with time ticks;
+- a virtualized transcript with full-text search and colored speaker
+  dots;
+- inline-renameable speaker chips at the top (rename a chip → relabels
+  every segment with that speaker, persisted server-side);
+- lasso-select on the scatter → bulk rename to any name;
+- TXT / VTT / SRT export buttons;
+- keyboard navigation: ↑/↓ step segments, Space play/pause, `/` focus
+  search, Esc clear selection.
+
+For frontend development:
+
+```bash
+cd web
+pnpm install
+pnpm dev          # http://127.0.0.1:5173, proxies /api to :8000
+# in another shell, run the API alone:
+transcriber serve interview.mp3 --participants 3 --port 8000
+```
+
+For production-ish: `pnpm build` once, then `transcriber serve …` is
+fully self-contained.
 
 ## Library use
 
@@ -93,21 +136,21 @@ stage's config invalidates only that stage and its dependents.
 
 ## Backends
 
-| Concern    | Default                                   | Override via                 |
-|------------|-------------------------------------------|------------------------------|
-| Transcribe | `faster-whisper` large-v3                 | `--backend openai`           |
-| Embed      | `nvidia/speakerverification_en_titanet_large` | pass `embedder=` to `run_pipeline` |
-| Cluster    | UMAP(2) + KMeans + silhouette             | pass a `ClusterConfig`        |
-| YouTube    | `yt-dlp`                                  | replace `YouTubeDownloader`   |
+| Concern    | Default                                       | Override via                       |
+|------------|-----------------------------------------------|-------------------------------------|
+| Transcribe | `faster-whisper` large-v3                     | `--backend openai`                  |
+| Embed      | `nvidia/speakerverification_en_titanet_large` | pass `embedder=` to `run_pipeline`  |
+| Cluster    | UMAP(2) + KMeans + silhouette                 | pass a `ClusterConfig`              |
+| YouTube    | `yt-dlp`                                      | replace `YouTubeDownloader`         |
 
-All backends are protocols — see `transcriber/transcribe/base.py`,
+All backends are Protocols — see `transcriber/transcribe/base.py`,
 `transcriber/embed/base.py`. Tests use in-memory fakes.
 
 ## Tests
 
 ```bash
-uv pip install -e ".[dev,cluster]"
-pytest                  # core + clustering tests
+uv pip install -e ".[dev,cluster,api]"
+pytest                  # core + clustering + api tests
 pytest -m "not slow"    # skip heavy/network tests
 ```
 

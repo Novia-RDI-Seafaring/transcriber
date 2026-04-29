@@ -1,5 +1,12 @@
 """OpenAI Whisper API backend.
 
+The verbose_json response with ``timestamp_granularities=["word"]`` returns
+words *without* sentence punctuation, but the top-level ``text`` field has
+all the punctuation. We re-attach trailing punctuation to each word by
+walking the text alongside the word list. Without this step the segmenter
+only sees the natural pauses, which produces a handful of huge multi-minute
+segments instead of normal sentences.
+
 Requires the ``openai`` extra: ``pip install transcriber[openai]``.
 """
 
@@ -13,6 +20,8 @@ from transcriber.models import Word
 from transcriber.transcribe.base import initial_prompt
 
 log = get_logger(__name__)
+
+_TRAILING_PUNCT = ".,?!;:—…"
 
 
 class OpenAIWhisperTranscriber:
@@ -53,19 +62,54 @@ class OpenAIWhisperTranscriber:
                 timestamp_granularities=["word"],
             )
 
-        # Response contains either .words attribute (typed) or dict-style.
-        raw_words = getattr(response, "words", None)
-        if raw_words is None and isinstance(response, dict):
-            raw_words = response.get("words", [])
-        return [_to_word(w) for w in raw_words or []]
+        raw_words = _get(response, "words") or []
+        full_text = _get(response, "text") or ""
+        words = [_to_word(w) for w in raw_words]
+        return _attach_punctuation(full_text, words)
 
 
 def _to_word(w: Any) -> Word:
     text = _get(w, "word") or _get(w, "text") or ""
-    return Word(text=str(text), start=float(_get(w, "start") or 0.0), end=float(_get(w, "end") or 0.0))
+    return Word(
+        text=str(text),
+        start=float(_get(w, "start") or 0.0),
+        end=float(_get(w, "end") or 0.0),
+    )
 
 
 def _get(obj: Any, key: str) -> Any:
     if isinstance(obj, dict):
         return obj.get(key)
     return getattr(obj, key, None)
+
+
+def _attach_punctuation(text: str, words: list[Word]) -> list[Word]:
+    """Walk ``words`` alongside ``text`` and reattach trailing punctuation.
+
+    For each word we find its first occurrence in ``text`` starting from the
+    last consumed position, then look at the immediately-following non-space
+    characters: if any of them are sentence punctuation we append them to
+    the word's text. This restores the period/?/! that Whisper strips when
+    word-level timestamps are requested.
+    """
+    if not text or not words:
+        return words
+
+    out: list[Word] = []
+    cursor = 0
+    text_len = len(text)
+    for w in words:
+        wt = w.text
+        idx = text.find(wt, cursor)
+        if idx < 0:
+            out.append(w)
+            continue
+        end = idx + len(wt)
+        punct = ""
+        j = end
+        while j < text_len and text[j] in _TRAILING_PUNCT:
+            punct += text[j]
+            j += 1
+        cursor = j
+        out.append(Word(text=wt + punct, start=w.start, end=w.end) if punct else w)
+    return out
