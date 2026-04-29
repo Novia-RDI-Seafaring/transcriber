@@ -27,6 +27,7 @@ from transcriber._logging import get_logger
 from transcriber.models import PipelineResult
 from transcriber.ui.colors import assign_colors
 from transcriber.ui.figure import make_scatter
+from transcriber.ui.timeline import make_timeline
 
 log = get_logger(__name__)
 
@@ -71,13 +72,27 @@ def register_callbacks(app: dash.Dash, result: PipelineResult) -> None:
     @app.callback(
         Output("highlighted-point", "data"),
         Input("scatter-plot", "clickData"),
+        Input("timeline", "clickData"),
         prevent_initial_call=True,
     )
-    def store_highlighted_point(click_data: dict[str, Any] | None) -> list[int] | None:
-        if click_data:
-            point_index = click_data["points"][0]["pointIndex"]
-            return [point_index]
-        return None
+    def store_highlighted_point(
+        scatter_click: dict[str, Any] | None,
+        timeline_click: dict[str, Any] | None,
+    ) -> list[int] | None:
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            return None
+        trigger = ctx.triggered[0]["prop_id"]
+        click_data = scatter_click if "scatter-plot" in trigger else timeline_click
+        if not click_data:
+            return None
+        point = click_data["points"][0]
+        # Scatter exposes ``pointIndex``; the timeline Bar trace exposes
+        # the original index via ``customdata``.
+        index = point.get("pointIndex")
+        if index is None:
+            index = point.get("customdata")
+        return [int(index)] if index is not None else None
 
     @app.callback(
         Output("dynamic-content", "children"),
@@ -115,6 +130,7 @@ def register_callbacks(app: dash.Dash, result: PipelineResult) -> None:
     @app.callback(
         Output("speaker-labels", "data"),
         Output("scatter-plot", "figure", allow_duplicate=True),
+        Output("timeline", "figure", allow_duplicate=True),
         Output("highlighted-point", "data", allow_duplicate=True),
         Input("submit-button", "n_clicks"),
         State("speaker-labels", "data"),
@@ -129,26 +145,23 @@ def register_callbacks(app: dash.Dash, result: PipelineResult) -> None:
         selected_data: dict[str, Any] | None,
         name: str | None,
         highlighted_point: list[int] | None,
-    ) -> tuple[list[str], Any, Any]:
+    ) -> tuple[list[str], Any, Any, Any]:
         if name and selected_data:
             indices = [point["pointIndex"] for point in selected_data["points"]]
             for idx in indices:
                 speakers[idx] = name
             cleared_highlight = None
-            figure = make_scatter(
-                projection,
-                segments,
-                speakers,
-                selected_indices=cleared_highlight,
-            )
-            return speakers, figure, cleared_highlight
-        return speakers, dash.no_update, dash.no_update
+            scatter = make_scatter(projection, segments, speakers, selected_indices=cleared_highlight)
+            timeline = make_timeline(segments, speakers, selected_indices=cleared_highlight)
+            return speakers, scatter, timeline, cleared_highlight
+        return speakers, dash.no_update, dash.no_update, dash.no_update
 
     @app.callback(
         Output("transcript", "children"),
         Output("bottom-ui1", "children"),
         Output("highlighted-point", "data", allow_duplicate=True),
         Output("scatter-plot", "figure", allow_duplicate=True),
+        Output("timeline", "figure", allow_duplicate=True),
         Input("speaker-labels", "data"),
         Input("highlighted-point", "data"),
         Input({"type": "transcript-p", "index": ALL}, "n_clicks"),
@@ -162,17 +175,17 @@ def register_callbacks(app: dash.Dash, result: PipelineResult) -> None:
         n_clicks: list[int],
         selected_data: dict[str, Any] | None,
         ids: list[dict[str, Any]],
-    ) -> tuple[Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any]:
         ctx = dash.callback_context
         if not ctx.triggered:
-            return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+            return (dash.no_update,) * 5  # type: ignore[return-value]
 
         if (
             selected_data is not None
             and "points" in selected_data
             and len(selected_data["points"]) > 0
         ):
-            return dash.no_update, None, dash.no_update, dash.no_update
+            return dash.no_update, None, dash.no_update, dash.no_update, dash.no_update
 
         triggered_prop_id = ctx.triggered[0]["prop_id"]
         color_map = assign_colors(speakers)
@@ -208,15 +221,13 @@ def register_callbacks(app: dash.Dash, result: PipelineResult) -> None:
                 segment=segments[point_index],
                 point_index=point_index,
             )
-            figure = make_scatter(
-                projection,
-                segments,
-                speakers,
-                selected_indices=selected_indices,
-            )
-            return transcript_children, audio_player, selected_indices, figure
+            scatter = make_scatter(projection, segments, speakers, selected_indices=selected_indices)
+            timeline = make_timeline(segments, speakers, selected_indices=selected_indices)
+            return transcript_children, audio_player, selected_indices, scatter, timeline
 
-        return transcript_children, dash.no_update, dash.no_update, dash.no_update
+        # No highlight — still refresh the timeline so it reflects label changes.
+        timeline = make_timeline(segments, speakers, selected_indices=None)
+        return transcript_children, dash.no_update, dash.no_update, dash.no_update, timeline
 
     app.clientside_callback(
         """

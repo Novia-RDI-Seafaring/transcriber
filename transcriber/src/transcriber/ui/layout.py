@@ -11,15 +11,23 @@ from dash import dcc, html
 
 from transcriber.models import PipelineResult
 from transcriber.ui.figure import make_scatter
+from transcriber.ui.timeline import make_timeline
+
+TIMELINE_HEIGHT = 110
 
 
 def build_layout(result: PipelineResult, *, height: int = 300) -> html.Div:
     """Return the root layout for the Dash app."""
     speaker_labels = list(result.cluster.labels)
-    initial_figure = make_scatter(
+    initial_scatter = make_scatter(
         result.cluster.projection,
         result.segments,
         speaker_labels,
+    )
+    initial_timeline = make_timeline(
+        result.segments,
+        speaker_labels,
+        height=TIMELINE_HEIGHT,
     )
 
     left_pane = html.Div(
@@ -29,7 +37,7 @@ def build_layout(result: PipelineResult, *, height: int = 300) -> html.Div:
                     dcc.Graph(
                         id="scatter-plot",
                         config={"displayModeBar": False},
-                        figure=initial_figure,
+                        figure=initial_scatter,
                     )
                 ],
                 style={
@@ -40,30 +48,36 @@ def build_layout(result: PipelineResult, *, height: int = 300) -> html.Div:
                 },
             ),
             html.Div(
+                [
+                    dcc.Graph(
+                        id="timeline",
+                        config={"displayModeBar": False},
+                        figure=initial_timeline,
+                    )
+                ],
+                style={
+                    "width": "100%",
+                    "display": "inline-block",
+                    "height": f"{TIMELINE_HEIGHT}px",
+                },
+            ),
+            html.Div(
                 id="dynamic-content",
                 children="",
                 style={
                     "zIndex": "100",
-                    "height": "50px",
                     "verticalAlign": "top",
-                    "position": "absolute",
-                    "padding": "30px",
+                    "padding": "10px 30px",
                     "width": "450px",
-                    "left": "50px",
-                    "top": f"{height + 50}px",
                 },
             ),
             html.Div(
                 id="bottom-ui1",
                 children="",
                 style={
-                    "height": f"{height - 50}px",
                     "verticalAlign": "top",
-                    "padding": "30px",
-                    "position": "absolute",
-                    "top": f"{height + 100}px",
-                    "left": "50px",
-                    "width": "70%",
+                    "padding": "10px 30px",
+                    "width": "90%",
                 },
             ),
         ],
@@ -71,7 +85,7 @@ def build_layout(result: PipelineResult, *, height: int = 300) -> html.Div:
             "width": "50%",
             "display": "inline-block",
             "height": "100vh",
-            "position": "relative",
+            "verticalAlign": "top",
         },
     )
 

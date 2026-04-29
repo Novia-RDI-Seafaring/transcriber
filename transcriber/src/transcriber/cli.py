@@ -29,6 +29,30 @@ app = typer.Typer(
 log = get_logger(__name__)
 
 
+def _is_url(s: str) -> bool:
+    return s.startswith(("http://", "https://"))
+
+
+def _resolve_audio(source: str, *, work_dir: Path) -> Path:
+    """Return a local audio path for ``source``.
+
+    A URL is downloaded into ``work_dir/youtube`` (cached on the YouTube
+    video id); a local path is validated to exist.
+    """
+    if _is_url(source):
+        from transcriber.download.youtube import download_youtube
+
+        download_dir = work_dir / "youtube"
+        log.info("downloading %s into %s", source, download_dir)
+        result = download_youtube(source, download_dir, use_cached=True)
+        log.info("audio: %s (%s)", result.audio_path, result.title)
+        return result.audio_path
+    path = Path(source)
+    if not path.exists():
+        raise typer.BadParameter(f"audio file does not exist: {path}")
+    return path
+
+
 def _build_config(
     *,
     backend: str,
@@ -54,7 +78,13 @@ def _build_config(
 
 @app.command()
 def transcribe(
-    audio: Annotated[Path, typer.Argument(help="Audio file to transcribe (mp3/wav/m4a/...).")],
+    source: Annotated[
+        str,
+        typer.Argument(
+            metavar="AUDIO_OR_URL",
+            help="Local audio file (mp3/wav/m4a/...) or a YouTube URL.",
+        ),
+    ],
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Where to write the transcript. Default: <audio>.txt"),
@@ -81,8 +111,9 @@ def transcribe(
     ] = "",
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
-    """Run the full pipeline on ``AUDIO`` and write a transcript."""
+    """Run the full pipeline on ``AUDIO_OR_URL`` and write a transcript."""
     configure_logging("DEBUG" if verbose else "INFO")
+    audio = _resolve_audio(source, work_dir=work_dir)
     cfg = _build_config(
         backend=backend,
         language=language,
@@ -126,7 +157,13 @@ def download(
 
 @app.command("ui")
 def ui_command(
-    audio: Annotated[Path, typer.Argument(help="Audio file (or path to a YouTube-downloaded mp3).")],
+    source: Annotated[
+        str,
+        typer.Argument(
+            metavar="AUDIO_OR_URL",
+            help="Local audio file or a YouTube URL.",
+        ),
+    ],
     backend: Annotated[str, typer.Option(help="local or openai.")] = "local",
     language: Annotated[str, typer.Option()] = "en",
     participants: Annotated[int | None, typer.Option()] = None,
@@ -136,6 +173,7 @@ def ui_command(
 ) -> None:
     """Run the pipeline (cached) and launch the interactive Dash UI."""
     configure_logging("DEBUG" if debug else "INFO")
+    audio = _resolve_audio(source, work_dir=work_dir)
     cfg = _build_config(
         backend=backend,
         language=language,
