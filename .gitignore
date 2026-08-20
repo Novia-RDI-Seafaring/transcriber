@@ -24,14 +24,8 @@ src/transcriber/web/
 .ipynb_checkpoints/
 *.pickle
 
-# local legacy files from the v1 app (not part of the package)
+# local-only files (not part of the package)
 .claude/
-assets/
 data/
-env/
-flagged/
-NeMo/
-output_audio_clips/
-dash_audio.ipynb
-speaker-identifier.ipynb
-demo-audio.py
+_attic/
+uv.lock
