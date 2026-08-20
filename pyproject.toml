@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dialogue-transcriber"
-version = "0.1.1"
+version = "0.1.2"
 description = "Transcribe interviews and panel discussions, identify who said what via speaker-embedding clustering, and relabel speakers in an interactive web UI."
 readme = "README.md"
 requires-python = ">=3.10"

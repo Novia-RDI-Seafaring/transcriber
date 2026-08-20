@@ -59,6 +59,21 @@ def _is_url(s: str) -> bool:
     return s.startswith(("http://", "https://"))
 
 
+def _resolve_backend(explicit: str | None) -> str:
+    """Pick a transcription backend when none was given explicitly.
+
+    Prefer the OpenAI API when a key is available (fast everywhere),
+    otherwise fall back to the local faster-whisper model.
+    """
+    import os
+
+    if explicit is not None:
+        return explicit
+    backend = "openai" if os.environ.get("OPENAI_API_KEY") else "local"
+    log.info("no --backend given; using %s", backend)
+    return backend
+
+
 def _resolve_audio(source: str, *, work_dir: Path) -> Path:
     """Return a local audio path for ``source``.
 
@@ -135,7 +150,9 @@ def transcribe(
     work_dir: Annotated[
         Path, typer.Option(help="Cache directory.")
     ] = Path(".transcriber-cache"),
-    no_cache: Annotated[bool, typer.Option(help="Disable caching of stage outputs.")] = False,
+    no_cache: Annotated[
+        bool, typer.Option("--no-cache", help="Disable caching of stage outputs.")
+    ] = False,
     context: Annotated[
         str, typer.Option(help="Free-form context passed to Whisper as initial prompt.")
     ] = "",
@@ -176,7 +193,9 @@ def download(
     out_dir: Annotated[
         Path, typer.Option("--out-dir", "-o", help="Where to store downloaded audio.")
     ] = Path(".transcriber-cache/youtube"),
-    no_cache: Annotated[bool, typer.Option(help="Re-download even if cached.")] = False,
+    no_cache: Annotated[
+        bool, typer.Option("--no-cache", help="Re-download even if cached.")
+    ] = False,
 ) -> None:
     """Download a YouTube video's audio track."""
     configure_logging()
@@ -195,7 +214,12 @@ def serve_command(
             help="Optional starter job: a local audio file or a YouTube URL.",
         ),
     ] = None,
-    backend: Annotated[str, typer.Option(help="local or openai.")] = "openai",
+    backend: Annotated[
+        str | None,
+        typer.Option(
+            help="local or openai. Default: openai if an OPENAI_API_KEY is available, else local."
+        ),
+    ] = None,
     language: Annotated[str, typer.Option()] = "en",
     participants: Annotated[int | None, typer.Option()] = None,
     host: Annotated[str, typer.Option(help="Bind address.")] = "127.0.0.1",
@@ -224,7 +248,7 @@ def serve_command(
         port=port,
         web_dist=dist,
         starter_source=source,
-        starter_backend=backend,
+        starter_backend=_resolve_backend(backend),
         starter_language=language,
         starter_participants=participants,
     )

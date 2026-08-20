@@ -98,6 +98,9 @@ waveform, and click-to-play segments, and exports TXT/VTT/SRT:
 transcriber serve interview.mp3 --participants 3   # http://127.0.0.1:8000
 ```
 
+(`serve` auto-picks its backend: `openai` when a key is available, else
+`local` — same `--backend` override as `transcribe`.)
+
 The command blocks; run it in the background and tell the user the URL.
 Renames made in the UI are persisted server-side in the work dir.
 

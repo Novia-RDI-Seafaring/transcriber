@@ -1,73 +1,40 @@
-# React + TypeScript + Vite
+# Web frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React (Vite + TypeScript) review UI served by `transcriber serve`:
+a UMAP cluster scatter, a waveform with one region per segment, a
+Gantt-style speaker timeline, a searchable virtualized transcript, and
+inline speaker renaming. It talks to the FastAPI backend under `/api`.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev        # http://127.0.0.1:5173, proxies /api to :8000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Run the backend in another shell:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+transcriber serve interview.mp3 --port 8000
 ```
+
+## Production build
+
+```bash
+pnpm build      # outputs to dist/
+```
+
+`transcriber serve` looks for the build in two places: `web/dist` in a
+development checkout, or `transcriber/web/dist` inside an installed wheel.
+Release wheels bundle the build automatically — `.github/workflows/release.yml`
+runs `pnpm build` and copies `dist/` into the package before `uv build`.
+
+## Layout
+
+- `src/App.tsx` — layout and top-level state wiring
+- `src/store.ts` — client state (zustand)
+- `src/api.ts` / `src/types.ts` — backend API client and shared types
+- `src/components/` — Scatter, Timeline, Transcript, AudioPlayer, SpeakerChips,
+  Sidebar/JobsList (multi-job manager), NewJobDialog
+- `src/hooks/useKeyboardNav.ts` — ↑/↓ segment stepping, Space play/pause,
+  `/` search focus

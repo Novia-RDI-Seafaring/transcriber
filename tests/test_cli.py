@@ -121,3 +121,15 @@ def test_env_file_loaded_from_cwd(tmp_path: Path, monkeypatch):
     assert os.environ["TRANSCRIBER_TEST_ENV_KEY"] == "from-dotenv"
     # an already-exported variable is never overridden by the file
     assert os.environ["TRANSCRIBER_TEST_EXPORTED"] == "exported-wins"
+
+
+def test_resolve_backend(monkeypatch):
+    from transcriber.cli import _resolve_backend
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    assert _resolve_backend(None) == "openai"
+    assert _resolve_backend("local") == "local"
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert _resolve_backend(None) == "local"
+    assert _resolve_backend("openai") == "openai"

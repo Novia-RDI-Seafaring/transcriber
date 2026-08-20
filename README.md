@@ -52,6 +52,21 @@ exported in the environment or kept in a `.env` file in your project —
 the CLI loads `.env` from the working directory (or nearest parent), and
 exported variables always take precedence over the file.
 
+### Where does data go?
+
+- **Pipeline cache**: `./.transcriber-cache/` in the directory you run from
+  (override with `--work-dir`) — chunks, per-segment clips, embeddings,
+  YouTube downloads, and the web UI's job state. Safe to delete; it will be
+  rebuilt.
+- **Transcripts**: written next to the input audio (`interview.txt`), or
+  wherever `--output` points; `--output -` prints to stdout.
+- **Model weights** (local backend): downloaded once into `~/.cache`
+  (Hugging Face / NeMo). The Whisper large-v3 download is ~3 GB, so the
+  first local run takes a while.
+
+Nothing leaves your machine with the default local backend; `--backend
+openai` sends audio to the OpenAI API.
+
 ### Picking your extras
 
 `[all]` is the easy button. For smaller installs:
@@ -107,6 +122,11 @@ frontend. You get:
 - keyboard navigation (↑/↓ segments, Space play/pause, `/` search).
 
 Multiple jobs can run side by side; add more via the sidebar.
+
+`serve` picks its backend automatically: `openai` when an `OPENAI_API_KEY`
+is available (environment or `.env`), otherwise `local`. Pass `--backend`
+to choose explicitly. (A legacy single-job Dash UI is still available as
+`transcriber ui`.)
 
 ## For AI agents
 
@@ -183,6 +203,9 @@ All backends are Protocols — see `transcriber/transcribe/base.py` and
 are not required to run the suite.
 
 ## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and
+[CHANGELOG.md](CHANGELOG.md) for release history.
 
 ```bash
 git clone https://github.com/Novia-RDI-Seafaring/transcriber
