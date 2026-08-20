@@ -26,6 +26,11 @@ app = typer.Typer(
     add_completion=False,
 )
 
+# OIP (Open Ingestion Protocol) producer commands. See `transcriber oip --help`.
+from transcriber.oip.cli import app as _oip_app  # noqa: E402
+
+app.add_typer(_oip_app, name="oip")
+
 log = get_logger(__name__)
 
 

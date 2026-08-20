@@ -23,6 +23,7 @@ uv pip install "transcriber[embed]"     # + NeMo TitaNet speaker embedder
 uv pip install "transcriber[ui]"        # + (legacy) Dash UI
 uv pip install "transcriber[api]"       # + FastAPI backend (powers the React UI)
 uv pip install "transcriber[youtube]"   # + yt-dlp downloader
+uv pip install "transcriber[oip]"       # + MCP server for OIP consumers
 uv pip install "transcriber[all]"       # everything
 ```
 
@@ -157,6 +158,23 @@ pytest -m "not slow"    # skip heavy/network tests
 `ffmpeg` is auto-detected; tests that need it skip cleanly when it is
 absent. Tests that need NeMo or `faster-whisper` rely on injected fakes,
 so the heavy models are not required to run the suite.
+
+## OIP (Open Ingestion Protocol)
+
+This package is also an OIP producer — it can plug into Anchor or any
+other OIP-aware consumer with no consumer-side changes. See
+[Novia-RDI-Seafaring/OIP](https://github.com/Novia-RDI-Seafaring/OIP) for
+the spec, or run `oip spec` after `uv tool install oip`.
+
+```bash
+transcriber oip install --data-dir ~/transcripts            # register the producer
+transcriber oip ingest path/to/audio.mp3 --data-dir ~/transcripts
+oip validate ~/transcripts                                   # checks against the schemas
+```
+
+The OIP MCP server is exposed as the `transcriber-mcp` console script
+(or `transcriber oip serve`). Tool namespace: `transcribe`. Region kind:
+`transcript_segment`. `source_ref.kind`: `audio-timestamp`.
 
 ## License
 
