@@ -1,19 +1,35 @@
-# Ignore data directory
-data/audio/*
-data/diarization/*
-data/vtt/*
-data/video/*
-
-# Unignore sample subdirectories
-!data/audio/sample/
-!data/diarization/sample/
-!data/vtt/sample/
-
-# Ignore other files and directories
-flagged
-__pycache__
-.pytest_cache
-.ipynb_checkpoints
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+dist/
+build/
+*.wav
+*.mp3
+*.mp4
+*.vtt
+*.srt
+.cache/
+.transcriber-cache/
+demo-cache/
+.playwright-cli/
+docs-screenshot-*.png
+node_modules/
 .DS_Store
-env
+.ipynb_checkpoints/
+*.pickle
+
+# local legacy files from the v1 app (not part of the package)
+.claude/
+assets/
+data/
+env/
+flagged/
 NeMo/
+output_audio_clips/
+dash_audio.ipynb
+speaker-identifier.ipynb
+demo-audio.py
