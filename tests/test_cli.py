@@ -47,3 +47,57 @@ def test_resolve_audio_downloads_for_url(tmp_path: Path):
     assert call_args.kwargs["use_cached"] is True
     assert call_args.args[0] == "https://youtu.be/abc"
     assert call_args.args[1] == tmp_path / "youtube"
+
+
+def _fake_result():
+    from transcriber.models import Clip, ClusterResult, Segment, SpeakerSegment
+    import numpy as np
+
+    seg = SpeakerSegment(
+        segment=Segment(text="Hi.", start=0.0, end=1.0),
+        clip=Clip(path=Path("/tmp/x.wav"), start=0.0, end=1.0),
+        speaker="Speaker 1",
+    )
+
+    class _R:
+        segments = [seg]
+        cluster = ClusterResult(
+            labels=["Speaker 1"],
+            raw_labels=np.array([0]),
+            projection=np.zeros((1, 2)),
+            n_clusters=1,
+        )
+
+    return _R()
+
+
+def test_transcribe_json_to_stdout(tmp_path: Path):
+    import json
+
+    from typer.testing import CliRunner
+
+    from transcriber.cli import app
+
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"\x00")
+
+    with patch("transcriber.cli.run_pipeline", return_value=_fake_result()):
+        result = CliRunner().invoke(
+            app, ["transcribe", str(audio), "--format", "json", "--output", "-"]
+        )
+
+    assert result.exit_code == 0, result.output
+    doc = json.loads(result.stdout)
+    assert doc["speakers"] == ["Speaker 1"]
+    assert doc["segments"][0]["text"] == "Hi."
+
+
+def test_version_flag():
+    from typer.testing import CliRunner
+
+    from transcriber import __version__
+    from transcriber.cli import app
+
+    result = CliRunner().invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert __version__ in result.stdout

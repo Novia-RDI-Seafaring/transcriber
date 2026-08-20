@@ -62,3 +62,46 @@ def test_srt_uses_comma_separator_and_indices():
     out = render_srt(segs)
     assert out.startswith("1\n00:00:00,000 --> 00:00:01,000\nA: first\n")
     assert "2\n00:00:01,000 --> 00:00:02,500\nB: second\n" in out
+
+
+def test_json_shape():
+    import json
+
+    segs = [
+        _make("Hi.", 0.0, 1.5, "Alice"),
+        _make("Hello.", 1.5, 3.25, "Bob"),
+        _make("Bye.", 3.25, 4.0, "Alice"),
+    ]
+    from transcriber.render import render_json
+
+    doc = json.loads(render_json(segs))
+    assert doc["speakers"] == ["Alice", "Bob"]
+    assert doc["n_segments"] == 3
+    assert doc["duration"] == 4.0
+    assert doc["segments"][1] == {
+        "speaker": "Bob",
+        "start": 1.5,
+        "end": 3.25,
+        "text": "Hello.",
+    }
+
+
+def test_json_empty_and_unknown():
+    import json
+
+    from transcriber.render import render_json
+
+    assert json.loads(render_json([])) == {
+        "speakers": [],
+        "n_segments": 0,
+        "duration": 0.0,
+        "segments": [],
+    }
+    seg = SpeakerSegment(
+        segment=Segment(text="Hi.", start=0, end=1),
+        clip=Clip(path=Path("/tmp/x.wav"), start=0, end=1),
+        speaker=None,
+    )
+    doc = json.loads(render_json([seg], unknown="???"))
+    assert doc["speakers"] == ["???"]
+    assert doc["segments"][0]["speaker"] == "???"

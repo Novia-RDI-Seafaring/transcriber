@@ -14,17 +14,36 @@ from typing import Annotated
 
 import typer
 
+from transcriber import __version__
 from transcriber._logging import configure_logging, get_logger
 from transcriber.config import ClusterConfig, PipelineConfig, TranscribeConfig
 from transcriber.pipeline import run_pipeline
-from transcriber.render import render_srt, render_txt, render_vtt
+from transcriber.render import render_json, render_srt, render_txt, render_vtt
 
 app = typer.Typer(
     name="transcriber",
-    help="Transcribe interviews and identify speakers.",
+    help="Transcribe dialogues and identify who said what.",
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"transcriber {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version", callback=_version_callback, is_eager=True, help="Print version and exit."
+        ),
+    ] = False,
+) -> None:
+    """Transcribe dialogues and identify who said what."""
 
 # OIP (Open Ingestion Protocol) producer commands. See `transcriber oip --help`.
 from transcriber.oip.cli import app as _oip_app  # noqa: E402
@@ -91,8 +110,12 @@ def transcribe(
         ),
     ],
     output: Annotated[
-        Path | None,
-        typer.Option("--output", "-o", help="Where to write the transcript. Default: <audio>.txt"),
+        str | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Where to write the transcript ('-' for stdout). Default: <audio>.<format>",
+        ),
     ] = None,
     backend: Annotated[
         str, typer.Option(help="Transcription backend: openai or local.")
@@ -105,7 +128,7 @@ def transcribe(
         int, typer.Option(help="Chunk size for long audio.")
     ] = 600,
     fmt: Annotated[
-        str, typer.Option("--format", help="Output format: txt, vtt, or srt.")
+        str, typer.Option("--format", help="Output format: txt, vtt, srt, or json.")
     ] = "txt",
     work_dir: Annotated[
         Path, typer.Option(help="Cache directory.")
@@ -130,18 +153,19 @@ def transcribe(
     )
     result = run_pipeline(audio, config=cfg)
 
-    if fmt == "txt":
-        text = render_txt(result.segments)
-    elif fmt == "vtt":
-        text = render_vtt(result.segments)
-    elif fmt == "srt":
-        text = render_srt(result.segments)
-    else:
+    renderers = {"txt": render_txt, "vtt": render_vtt, "srt": render_srt, "json": render_json}
+    if fmt not in renderers:
         raise typer.BadParameter(f"unknown format: {fmt}")
+    text = renderers[fmt](result.segments)
 
-    out = output or audio.with_suffix(f".{fmt}")
-    out.write_text(text, encoding="utf-8")
-    typer.echo(f"wrote {out}  ({result.cluster.n_clusters} speakers, {len(result.segments)} segments)")
+    summary = f"{result.cluster.n_clusters} speakers, {len(result.segments)} segments"
+    if output == "-":
+        typer.echo(text)
+        typer.echo(summary, err=True)
+    else:
+        out = Path(output) if output else audio.with_suffix(f".{fmt}")
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {out}  ({summary})")
 
 
 @app.command()
@@ -149,7 +173,7 @@ def download(
     url: Annotated[str, typer.Argument(help="YouTube URL.")],
     out_dir: Annotated[
         Path, typer.Option("--out-dir", "-o", help="Where to store downloaded audio.")
-    ] = Path("data/audio/youtube"),
+    ] = Path(".transcriber-cache/youtube"),
     no_cache: Annotated[bool, typer.Option(help="Re-download even if cached.")] = False,
 ) -> None:
     """Download a YouTube video's audio track."""
