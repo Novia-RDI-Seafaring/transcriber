@@ -1,0 +1,11 @@
+{
+  "name": "dialogue-transcriber",
+  "description": "Transcribe interviews and panel discussions and identify who said what (speaker diarization), via the dialogue-transcriber CLI.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Novia University of Applied Sciences, RDI Seafaring",
+    "url": "https://github.com/Novia-RDI-Seafaring"
+  },
+  "homepage": "https://github.com/Novia-RDI-Seafaring/transcriber",
+  "license": "Apache-2.0"
+}

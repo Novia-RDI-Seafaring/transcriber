@@ -1,0 +1,15 @@
+{
+  "name": "dialogue-transcriber",
+  "description": "Speaker-identifying transcription tools from Novia RDI Seafaring.",
+  "owner": {
+    "name": "Novia University of Applied Sciences, RDI Seafaring",
+    "url": "https://github.com/Novia-RDI-Seafaring"
+  },
+  "plugins": [
+    {
+      "name": "dialogue-transcriber",
+      "source": "./",
+      "description": "Transcribe interviews and panel discussions and identify who said what (speaker diarization), via the dialogue-transcriber CLI."
+    }
+  ]
+}
