@@ -1,106 +1,151 @@
-# transcriber
+# dialogue-transcriber
 
-Transcribe interviews, identify speakers from voice embeddings, and
-relabel them interactively in a React web UI.
+**Transcribe conversations and find out who said what.**
 
-The pipeline takes an audio file (or a YouTube URL), produces word-level
-timestamps with Whisper, groups words into sentence segments, extracts a
-short audio clip per segment, embeds each clip with NVIDIA NeMo TitaNet,
-clusters the embeddings on a UMAP projection, and emits a transcript
-labeled with `Speaker 1`, `Speaker 2`, …. The web UI lets you lasso a
-cluster, rename it inline, hear individual segments, and search the
-transcript — all synchronized across a UMAP scatter, a Gantt-style
-timeline, and a continuous waveform with one region per segment.
+[![CI](https://github.com/Novia-RDI-Seafaring/transcriber/actions/workflows/ci.yml/badge.svg)](https://github.com/Novia-RDI-Seafaring/transcriber/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/dialogue-transcriber)](https://pypi.org/project/dialogue-transcriber/)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 
-## Install
+Point it at an interview, panel discussion, meeting recording, or YouTube
+URL and get back a transcript where every line is attributed to a speaker —
+plus a web UI to inspect the speaker clusters, listen to any segment, and
+fix labels by hand.
 
-```bash
-uv pip install transcriber              # core only
-uv pip install "transcriber[local]"     # + faster-whisper backend
-uv pip install "transcriber[openai]"    # + OpenAI Whisper API backend
-uv pip install "transcriber[cluster]"   # + scikit-learn / UMAP
-uv pip install "transcriber[embed]"     # + NeMo TitaNet speaker embedder
-uv pip install "transcriber[ui]"        # + (legacy) Dash UI
-uv pip install "transcriber[api]"       # + FastAPI backend (powers the React UI)
-uv pip install "transcriber[youtube]"   # + yt-dlp downloader
-uv pip install "transcriber[oip]"       # + MCP server for OIP consumers
-uv pip install "transcriber[all]"       # everything
+![The review UI: speaker clusters, waveform, timeline, and searchable transcript](docs/screenshot-ui.png)
+
+## How it works
+
+```
+audio  ──►  transcribe  ──►  segment  ──►  extract_clips  ──►  embed  ──►  cluster
+              (Whisper)        (sentence-       (ffmpeg)       (TitaNet)    (UMAP +
+                               level)                                       KMeans +
+                                                                            silhouette)
 ```
 
-`ffmpeg` and `ffprobe` must be on `PATH`. On macOS:
+Whisper produces word-level timestamps; words are grouped into sentence
+segments; each segment's audio is embedded with NVIDIA NeMo TitaNet; the
+embeddings are clustered on a UMAP projection; and the transcript comes out
+labeled `Speaker 1`, `Speaker 2`, … Every stage is cached on content hash,
+so re-runs and config tweaks are cheap.
+
+## Quickstart
+
+`ffmpeg` and `ffprobe` must be on `PATH` (`brew install ffmpeg` on macOS).
 
 ```bash
-brew install ffmpeg
+# No install needed:
+uvx --from "dialogue-transcriber[all]" transcriber transcribe interview.mp3
+
+# Or install the tool:
+uv tool install "dialogue-transcriber[all]"
+
+transcriber transcribe interview.mp3 --participants 2
+transcriber transcribe "https://www.youtube.com/watch?v=..." --backend openai
+transcriber serve interview.mp3        # review UI on http://127.0.0.1:8000
 ```
 
-For local development:
+The default backend runs [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+locally; `--backend openai` uses the OpenAI Whisper API instead (requires
+`OPENAI_API_KEY`, much faster on machines without a GPU).
+
+### Picking your extras
+
+`[all]` is the easy button. For smaller installs:
 
 ```bash
-git clone <repo>
-cd transcriber
-uv venv
-uv pip install -e ".[dev,cluster,api,openai,embed,youtube]"
-# build the React frontend once so `transcriber serve` can serve it
-(cd web && pnpm install && pnpm build)
+uv pip install dialogue-transcriber              # core only
+uv pip install "dialogue-transcriber[local]"     # + faster-whisper backend
+uv pip install "dialogue-transcriber[openai]"    # + OpenAI Whisper API backend
+uv pip install "dialogue-transcriber[cluster]"   # + scikit-learn / UMAP
+uv pip install "dialogue-transcriber[embed]"     # + NeMo TitaNet speaker embedder
+uv pip install "dialogue-transcriber[api]"       # + FastAPI backend (powers the web UI)
+uv pip install "dialogue-transcriber[youtube]"   # + yt-dlp downloader
+uv pip install "dialogue-transcriber[oip]"       # + MCP server for OIP consumers
 ```
 
 ## CLI
 
 ```bash
-# Run the full pipeline and emit a speaker-labeled .txt next to the audio
+# Full pipeline; writes a speaker-labeled transcript next to the audio
 transcriber transcribe path/to/audio.mp3
 
-# Specify number of speakers, language, output format
+# Speakers, language, format
 transcriber transcribe interview.mp3 --participants 3 --language sv --format vtt
 
-# OpenAI Whisper API instead of the local model
-transcriber transcribe interview.mp3 --backend openai
+# Machine-readable output on stdout (see "For AI agents" below)
+transcriber transcribe interview.mp3 --format json --output -
 
 # Pull audio from YouTube
-transcriber download https://www.youtube.com/watch?v=...
+transcriber download "https://www.youtube.com/watch?v=..."
 
-# Run pipeline + serve the React UI on http://127.0.0.1:8000
+# Pipeline + web UI
 transcriber serve interview.mp3 --participants 3
-transcriber serve "https://www.youtube.com/watch?v=..." --backend openai --participants 3
-
-# Legacy Dash UI on http://127.0.0.1:8051 (still works)
-transcriber ui interview.mp3 --participants 2
 ```
 
-`transcriber serve` accepts the same `AUDIO_OR_URL` argument as
-`transcribe`. URLs are downloaded once into `<work-dir>/youtube/<id>/`
-and reused.
+Formats: `txt` (merged speaker turns), `vtt`, `srt`, `json`. Pass
+`--context "names, jargon"` to prime Whisper with vocabulary it should
+expect. `--output -` streams the transcript to stdout and the summary to
+stderr, so the output pipes cleanly.
 
 ## Web UI
 
-`transcriber serve` runs uvicorn + the FastAPI backend, and serves the
-built React frontend from `web/dist`. The UI gives you:
+`transcriber serve` runs a FastAPI backend and serves the bundled React
+frontend. You get:
 
-- a UMAP scatter where each dot is one segment, colored by cluster;
-- a continuous audio waveform with one **region** per segment, colored
-  by speaker — click a region or scrub to play any part;
-- a Gantt-style timeline with time ticks;
-- a virtualized transcript with full-text search and colored speaker
-  dots;
-- inline-renameable speaker chips at the top (rename a chip → relabels
-  every segment with that speaker, persisted server-side);
-- lasso-select on the scatter → bulk rename to any name;
-- TXT / VTT / SRT export buttons;
-- keyboard navigation: ↑/↓ step segments, Space play/pause, `/` focus
-  search, Esc clear selection.
+- a UMAP scatter where each dot is one segment, colored by cluster — lasso
+  a cluster to bulk-rename it;
+- a continuous waveform with one region per segment — click or scrub to
+  play anything;
+- a Gantt-style speaker timeline;
+- a virtualized transcript with full-text search;
+- inline-renameable speaker chips (renames persist server-side);
+- TXT / VTT / SRT export;
+- keyboard navigation (↑/↓ segments, Space play/pause, `/` search).
 
-For frontend development:
+Multiple jobs can run side by side; add more via the sidebar.
 
-```bash
-cd web
-pnpm install
-pnpm dev          # http://127.0.0.1:5173, proxies /api to :8000
-# in another shell, run the API alone:
-transcriber serve interview.mp3 --participants 3 --port 8000
+## For AI agents
+
+This project is built to be driven by agents as well as humans.
+
+**Claude Code skill** — the repo doubles as a
+[plugin marketplace](https://docs.claude.com/en/docs/claude-code/plugins).
+Install the skill and Claude Code will know how to transcribe and diarize
+audio on demand:
+
+```
+/plugin marketplace add Novia-RDI-Seafaring/transcriber
+/plugin install dialogue-transcriber@dialogue-transcriber
 ```
 
-For production-ish: `pnpm build` once, then `transcriber serve …` is
-fully self-contained.
+**Structured output** — `--format json --output -` emits a stable shape on
+stdout:
+
+```json
+{
+  "speakers": ["Speaker 1", "Speaker 2"],
+  "n_segments": 42,
+  "duration": 512.3,
+  "segments": [
+    {"speaker": "Speaker 1", "start": 0.0, "end": 4.2, "text": "..."}
+  ]
+}
+```
+
+**MCP / OIP** — the package is an
+[Open Ingestion Protocol](https://github.com/Novia-RDI-Seafaring/OIP)
+producer, so transcripts can be ingested by any OIP-aware consumer (e.g.
+Anchor) with no consumer-side changes:
+
+```bash
+transcriber oip install --data-dir ~/transcripts     # register the producer
+transcriber oip ingest audio.mp3 --data-dir ~/transcripts
+transcriber oip serve                                # MCP server (also: transcriber-mcp)
+```
+
+Tool namespace: `transcribe`. Region kind: `transcript_segment`.
+`source_ref.kind`: `audio-timestamp`.
 
 ## Library use
 
@@ -121,20 +166,6 @@ print(render_txt(result.segments))
 sentence text, time range, the on-disk clip, and the assigned speaker.
 `PipelineResult.cluster.projection` is the 2-D UMAP for plotting.
 
-## Pipeline stages
-
-```
-audio  ──►  transcribe  ──►  segment  ──►  extract_clips  ──►  embed  ──►  cluster
-              (Whisper)        (sentence-       (ffmpeg)       (TitaNet)    (UMAP +
-                               level)                                       KMeans +
-                                                                            silhouette)
-```
-
-Each stage's output is cached under `--work-dir` (default
-`.transcriber-cache`), keyed on the audio's content hash plus the
-relevant config. Re-running with the same inputs is free; changing one
-stage's config invalidates only that stage and its dependents.
-
 ## Backends
 
 | Concern    | Default                                       | Override via                       |
@@ -144,38 +175,31 @@ stage's config invalidates only that stage and its dependents.
 | Cluster    | UMAP(2) + KMeans + silhouette                 | pass a `ClusterConfig`              |
 | YouTube    | `yt-dlp`                                      | replace `YouTubeDownloader`         |
 
-All backends are Protocols — see `transcriber/transcribe/base.py`,
-`transcriber/embed/base.py`. Tests use in-memory fakes.
+All backends are Protocols — see `transcriber/transcribe/base.py` and
+`transcriber/embed/base.py`. Tests use in-memory fakes, so the heavy models
+are not required to run the suite.
 
-## Tests
+## Development
 
 ```bash
-uv pip install -e ".[dev,cluster,api]"
+git clone https://github.com/Novia-RDI-Seafaring/transcriber
+cd transcriber
+uv venv
+uv pip install -e ".[dev,cluster,api,openai,embed,youtube]"
+(cd web && pnpm install && pnpm build)   # so `transcriber serve` can serve the UI
+
 pytest                  # core + clustering + api tests
 pytest -m "not slow"    # skip heavy/network tests
+ruff check src tests
 ```
 
-`ffmpeg` is auto-detected; tests that need it skip cleanly when it is
-absent. Tests that need NeMo or `faster-whisper` rely on injected fakes,
-so the heavy models are not required to run the suite.
+For frontend work: `cd web && pnpm dev` (http://127.0.0.1:5173, proxies
+`/api` to :8000) with `transcriber serve … --port 8000` in another shell.
 
-## OIP (Open Ingestion Protocol)
-
-This package is also an OIP producer — it can plug into Anchor or any
-other OIP-aware consumer with no consumer-side changes. See
-[Novia-RDI-Seafaring/OIP](https://github.com/Novia-RDI-Seafaring/OIP) for
-the spec, or run `oip spec` after `uv tool install oip`.
-
-```bash
-transcriber oip install --data-dir ~/transcripts            # register the producer
-transcriber oip ingest path/to/audio.mp3 --data-dir ~/transcripts
-oip validate ~/transcripts                                   # checks against the schemas
-```
-
-The OIP MCP server is exposed as the `transcriber-mcp` console script
-(or `transcriber oip serve`). Tool namespace: `transcribe`. Region kind:
-`transcript_segment`. `source_ref.kind`: `audio-timestamp`.
+Releases: publishing a GitHub release triggers
+`.github/workflows/release.yml`, which builds the frontend, bundles it into
+the wheel, and publishes to PyPI via trusted publishing.
 
 ## License
 
-MIT.
+Apache-2.0 — see [LICENSE](LICENSE).
