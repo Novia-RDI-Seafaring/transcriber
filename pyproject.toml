@@ -72,12 +72,15 @@ Homepage = "https://github.com/Novia-RDI-Seafaring/transcriber"
 Repository = "https://github.com/Novia-RDI-Seafaring/transcriber"
 Issues = "https://github.com/Novia-RDI-Seafaring/transcriber/issues"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/transcriber"]
 # The built React frontend is copied to src/transcriber/web/dist before a
 # release build (see .github/workflows/release.yml); it is gitignored, so it
-# must be declared as an artifact to be picked up.
+# must be declared as an artifact — at build level, since the wheel is built
+# from the sdist and would otherwise lose it.
+[tool.hatch.build]
 artifacts = ["src/transcriber/web/"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/transcriber"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
