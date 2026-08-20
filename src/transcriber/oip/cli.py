@@ -21,7 +21,6 @@ from transcriber.oip.ingest import ingest_source
 from transcriber.oip.install import (
     install_manifest,
     manifest_payload,
-    project_producers_dir,
     system_producers_dir,
 )
 

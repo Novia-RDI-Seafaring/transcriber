@@ -6,12 +6,13 @@ installer never disagree.
 
 from __future__ import annotations
 
-from transcriber import __version__ as PRODUCER_VERSION
+from transcriber import __version__
 
+PRODUCER_VERSION = __version__
 OIP_VERSION = "0.1"
 PRODUCER_NAME = "transcriber"
 PRODUCER_DISPLAY_NAME = "Audio/Video Transcriber"
-PRODUCER_HOMEPAGE = "https://github.com/anthropics/transcriber"
+PRODUCER_HOMEPAGE = "https://github.com/Novia-RDI-Seafaring/transcriber"
 TOOLS_NAMESPACE = "transcribe"
 
 SOURCE_KINDS: tuple[str, ...] = (

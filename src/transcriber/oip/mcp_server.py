@@ -16,12 +16,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import Any
-
-import logging
 
 from transcriber._logging import get_logger
 from transcriber.oip.adapter import (

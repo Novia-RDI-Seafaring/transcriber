@@ -50,8 +50,9 @@ def test_resolve_audio_downloads_for_url(tmp_path: Path):
 
 
 def _fake_result():
-    from transcriber.models import Clip, ClusterResult, Segment, SpeakerSegment
     import numpy as np
+
+    from transcriber.models import Clip, ClusterResult, Segment, SpeakerSegment
 
     seg = SpeakerSegment(
         segment=Segment(text="Hi.", start=0.0, end=1.0),

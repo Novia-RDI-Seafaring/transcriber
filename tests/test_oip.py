@@ -32,7 +32,6 @@ from transcriber.oip.constants import (
 from transcriber.oip.install import install_manifest, manifest_payload
 from transcriber.oip.manifest import build_manifest
 
-
 # ---- manifest --------------------------------------------------------
 
 
