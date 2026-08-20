@@ -205,16 +205,16 @@ def serve_command(
 
 
 def _default_web_dist() -> Path | None:
-    """Locate the built React app shipped alongside the source tree.
+    """Locate the built React app.
 
-    Layout: ``<repo>/transcriber/src/transcriber/cli.py`` and
-    ``<repo>/transcriber/web/dist`` — so we walk three levels up from
-    this file (transcriber -> src -> transcriber-package-root).
+    In a development checkout it lives at ``<repo>/web/dist`` (three
+    levels up from this file: transcriber -> src -> repo root); in an
+    installed wheel it is bundled at ``transcriber/web/dist``.
     """
     here = Path(__file__).resolve()
     candidates = [
+        here.parent / "web" / "dist",  # installed wheel
         here.parent.parent.parent / "web" / "dist",  # development checkout
-        here.parent / "web" / "dist",  # installed wheel (if we ever ship it)
     ]
     for c in candidates:
         if c.is_dir():

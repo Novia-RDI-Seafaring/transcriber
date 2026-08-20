@@ -18,6 +18,8 @@ demo-cache/
 .playwright-cli/
 docs-screenshot-*.png
 node_modules/
+# built frontend copied into the package for wheel builds
+src/transcriber/web/
 .DS_Store
 .ipynb_checkpoints/
 *.pickle

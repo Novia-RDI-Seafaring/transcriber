@@ -3,18 +3,29 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "transcriber"
+name = "dialogue-transcriber"
 version = "0.1.0"
-description = "Transcribe interviews and identify speakers via embedding clustering, with an interactive UI for relabeling."
+description = "Transcribe interviews and panel discussions, identify who said what via speaker-embedding clustering, and relabel speakers in an interactive web UI."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
-authors = [{ name = "Christoffer Björkskog" }]
-keywords = ["transcription", "whisper", "speaker-diarization", "interview", "dash"]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Christoffer Björkskog" },
+    { name = "Novia University of Applied Sciences, RDI Seafaring" },
+]
+keywords = [
+    "transcription",
+    "whisper",
+    "speaker-diarization",
+    "speaker-identification",
+    "interview",
+    "dialogue",
+    "panel-discussion",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -48,18 +59,25 @@ dev = [
     "ruff>=0.4",
 ]
 all = [
-    "transcriber[openai,local,embed,cluster,youtube,ui,api,oip]",
+    "dialogue-transcriber[openai,local,embed,cluster,youtube,ui,api,oip]",
 ]
 
 [project.scripts]
 transcriber = "transcriber.cli:app"
+dialogue-transcriber = "transcriber.cli:app"
 transcriber-mcp = "transcriber.oip.mcp_server:main"
 
 [project.urls]
-Repository = "https://github.com/anthropics/transcriber"
+Homepage = "https://github.com/Novia-RDI-Seafaring/transcriber"
+Repository = "https://github.com/Novia-RDI-Seafaring/transcriber"
+Issues = "https://github.com/Novia-RDI-Seafaring/transcriber/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/transcriber"]
+# The built React frontend is copied to src/transcriber/web/dist before a
+# release build (see .github/workflows/release.yml); it is gitignored, so it
+# must be declared as an artifact to be picked up.
+artifacts = ["src/transcriber/web/"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
