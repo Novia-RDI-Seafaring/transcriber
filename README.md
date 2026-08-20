@@ -47,7 +47,10 @@ transcriber serve interview.mp3        # review UI on http://127.0.0.1:8000
 
 The default backend runs [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
 locally; `--backend openai` uses the OpenAI Whisper API instead (requires
-`OPENAI_API_KEY`, much faster on machines without a GPU).
+`OPENAI_API_KEY`, much faster on machines without a GPU). The key can be
+exported in the environment or kept in a `.env` file in your project —
+the CLI loads `.env` from the working directory (or nearest parent), and
+exported variables always take precedence over the file.
 
 ### Picking your extras
 

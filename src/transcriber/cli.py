@@ -15,6 +15,7 @@ from typing import Annotated
 import typer
 
 from transcriber import __version__
+from transcriber._env import load_env
 from transcriber._logging import configure_logging, get_logger
 from transcriber.config import ClusterConfig, PipelineConfig, TranscribeConfig
 from transcriber.pipeline import run_pipeline
@@ -44,6 +45,7 @@ def _main(
     ] = False,
 ) -> None:
     """Transcribe dialogues and identify who said what."""
+    load_env()
 
 # OIP (Open Ingestion Protocol) producer commands. See `transcriber oip --help`.
 from transcriber.oip.cli import app as _oip_app  # noqa: E402

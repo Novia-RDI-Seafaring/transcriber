@@ -36,8 +36,10 @@ Pick a transcription backend:
 - `--backend local` (default) — faster-whisper on this machine. No API key,
   but downloads a large model on first use and is slow without a GPU.
 - `--backend openai` — OpenAI Whisper API. Fast and light; requires
-  `OPENAI_API_KEY` in the environment. Prefer this when the key is available
-  and the audio is not sensitive; ask the user if unsure.
+  `OPENAI_API_KEY`, read from the environment or from a `.env` file in the
+  working directory (or a parent — exported variables win over the file).
+  Prefer this when the key is available and the audio is not sensitive; ask
+  the user if unsure.
 
 ## Transcribe (the main task)
 

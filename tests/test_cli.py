@@ -102,3 +102,22 @@ def test_version_flag():
     result = CliRunner().invoke(app, ["--version"])
     assert result.exit_code == 0
     assert __version__ in result.stdout
+
+
+def test_env_file_loaded_from_cwd(tmp_path: Path, monkeypatch):
+    import os
+
+    from transcriber._env import load_env
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("TRANSCRIBER_TEST_ENV_KEY", raising=False)
+    monkeypatch.setenv("TRANSCRIBER_TEST_EXPORTED", "exported-wins")
+    (tmp_path / ".env").write_text(
+        "TRANSCRIBER_TEST_ENV_KEY=from-dotenv\nTRANSCRIBER_TEST_EXPORTED=from-dotenv\n"
+    )
+
+    load_env()
+
+    assert os.environ["TRANSCRIBER_TEST_ENV_KEY"] == "from-dotenv"
+    # an already-exported variable is never overridden by the file
+    assert os.environ["TRANSCRIBER_TEST_EXPORTED"] == "exported-wins"

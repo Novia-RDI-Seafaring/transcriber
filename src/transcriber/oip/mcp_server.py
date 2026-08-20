@@ -243,6 +243,9 @@ async def _serve_mcp(data_dir: Path) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     """Entry point for the ``transcriber-mcp`` console script."""
+    from transcriber._env import load_env
+
+    load_env()
     args = _parse_args(argv)
     # Logs MUST go to stderr — stdout is the JSON-RPC channel. The
     # project's configure_logging() routes to stderr by default
